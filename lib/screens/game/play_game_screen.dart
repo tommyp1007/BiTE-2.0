@@ -37,6 +37,9 @@ class _PlayGameScreenState extends State<PlayGameScreen> with WidgetsBindingObse
   bool _isSuccess = false;
   bool _showHint = false;
   String _hintText = "";
+  
+  // --- NEW: Hint Tracking ---
+  int _hintsUsed = 0; 
 
   // --- Settings State ---
   double _bgmVolume = 0.5;
@@ -83,12 +86,12 @@ class _PlayGameScreenState extends State<PlayGameScreen> with WidgetsBindingObse
     _isSuccess = false;
     _showHint = false;
     _hintText = "";
+    _hintsUsed = 0; // Reset hints count for new level
 
     _prefs.setCurrentLevel(_currentLevel);
   }
 
   // --- Settings & Audio Methods ---
-  
   Future<void> _updateSettingsAndAudio({bool startMusic = false}) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.reload(); 
@@ -134,14 +137,12 @@ class _PlayGameScreenState extends State<PlayGameScreen> with WidgetsBindingObse
     });
   }
 
-  // UPDATED: Using heavyImpact for stronger vibration
   void _triggerVibration() {
     if (_vibrationEnabled) {
       HapticFeedback.heavyImpact(); 
     }
   }
 
-  // --- Helper: Get Image Asset ---
   String _getLevelImage(int level) {
     switch(level) {
       case 1: return 'assets/images/babu.png';
@@ -165,11 +166,13 @@ class _PlayGameScreenState extends State<PlayGameScreen> with WidgetsBindingObse
 
   // --- Logic: Hint ---
   void _toggleHint() {
-    _triggerVibration(); // Added vibration on toggle
+    _triggerVibration();
     setState(() {
       if (_showHint) {
         _showHint = false;
       } else {
+        // HINT OPENED -> Increment usage count
+        _hintsUsed++; 
         _hintText = _generateHint(_targetWord);
         _showHint = true;
       }
@@ -214,7 +217,7 @@ class _PlayGameScreenState extends State<PlayGameScreen> with WidgetsBindingObse
   void _onKeyPress(String char) {
     if (_isGameFinished && _isSuccess) return; 
     
-    _triggerVibration(); // Vibration on key press
+    _triggerVibration(); 
     setState(() {
       if (_isGameFinished && !_isSuccess) {
         _isGameFinished = false;
@@ -225,9 +228,6 @@ class _PlayGameScreenState extends State<PlayGameScreen> with WidgetsBindingObse
     _playSound('pop');
   }
 
-  // --- BACKSPACE LOGIC ---
-  
-  // Single Tap: Deletes one character
   void _onBackspace() {
     if (_isGameFinished && _isSuccess) return; 
     
@@ -244,7 +244,6 @@ class _PlayGameScreenState extends State<PlayGameScreen> with WidgetsBindingObse
     }
   }
 
-  // Long Press: Clears ALL characters
   void _onClearAll() {
     if (_isGameFinished && _isSuccess) return;
 
@@ -262,7 +261,7 @@ class _PlayGameScreenState extends State<PlayGameScreen> with WidgetsBindingObse
   }
 
   void _handleSubmit() {
-    _triggerVibration(); // Vibration on Submit/Next Level
+    _triggerVibration();
 
     if (_isGameFinished && _isSuccess) {
       if (_isFinalLevel()) {
@@ -282,28 +281,51 @@ class _PlayGameScreenState extends State<PlayGameScreen> with WidgetsBindingObse
     } else {
       _playSound('wrong');
       setState(() {
-        _isGameFinished = true; // Shows "Incorrect"
+        _isGameFinished = true;
         _isSuccess = false;    
       });
     }
   }
 
+  // --- UPDATED: Star Calculation Logic ---
   void _handleCorrectAnswer() async {
     setState(() {
       _isGameFinished = true;
       _isSuccess = true;
     });
 
+    // 1. Calculate Stars
+    int starsEarned;
+    if (_hintsUsed <= 3) {
+      starsEarned = 3;
+    } else if (_hintsUsed <= 8) {
+      starsEarned = 2;
+    } else {
+      starsEarned = 1;
+    }
+
+    // 2. Save Stars Locally
+    // We only update if the new star count is higher than previous best, OR just overwrite since user replayed?
+    // User requirement implies "reset" resets everything, but replaying usually updates.
+    // Let's always save the latest result for simplicity.
+    await _prefs.setStarsForLevel(_currentLevel, starsEarned);
+
+    // 3. Unlock Next Level Logic
     int unlockedLevel = await _prefs.getUnlockedLevel();
     if (_currentLevel >= unlockedLevel) {
       await _prefs.setUnlockedLevel(_currentLevel + 1);
+    }
 
-      User? user = _auth.currentUser;
-      if (user != null) {
-        _db.collection('users').doc(user.uid).update({
-          'unlockedLevel': _currentLevel + 1
-        });
-      }
+    // 4. Save to Firestore
+    User? user = _auth.currentUser;
+    if (user != null) {
+      Map<String, dynamic> updateData = {
+        'unlockedLevel': (_currentLevel >= unlockedLevel) ? _currentLevel + 1 : unlockedLevel,
+        // Update levelStars map. We use dot notation for nested fields or Merge
+        'levelStars.$_currentLevel': starsEarned
+      };
+      
+      _db.collection('users').doc(user.uid).set(updateData, SetOptions(merge: true));
     }
   }
 
@@ -342,20 +364,17 @@ class _PlayGameScreenState extends State<PlayGameScreen> with WidgetsBindingObse
       context,
       MaterialPageRoute(
         builder: (_) => GameSettingsScreen(
-          // Immediate BGM update
           onBgmVolumeChanged: (vol) {
             _bgmVolume = vol;
             _bgmPlayer.setVolume(vol);
           },
-          // Immediate SFX update
           onSfxVolumeChanged: (vol) {
             _sfxVolume = vol;
             _sfxPlayer.setVolume(vol);
           },
-          // Immediate Vibration update
           onVibrationChanged: (val) {
             _vibrationEnabled = val;
-            _triggerVibration(); // Test vibrate when toggled
+            _triggerVibration();
           },
         ),
       ),
@@ -466,6 +485,22 @@ class _PlayGameScreenState extends State<PlayGameScreen> with WidgetsBindingObse
                             children: [
                               Image.asset('assets/images/correct.png', height: 40),
                               Text("Correct! Well done.", style: TextStyle(color: Colors.greenAccent, fontSize: 18, fontWeight: FontWeight.bold)),
+                              // --- Show Stars Earned Immediately ---
+                              SizedBox(height: 5),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: List.generate(3, (index) {
+                                  int stars = 1;
+                                  if (_hintsUsed <= 3) stars = 3;
+                                  else if (_hintsUsed <= 8) stars = 2;
+                                  
+                                  return Icon(
+                                    index < stars ? Icons.star : Icons.star_border,
+                                    color: Colors.amber,
+                                    size: 30,
+                                  );
+                                }),
+                              )
                             ],
                           )
                         else
@@ -556,9 +591,8 @@ class _PlayGameScreenState extends State<PlayGameScreen> with WidgetsBindingObse
                           Expanded(
                             child: ElevatedButton(
                               onPressed: () {
-                                _triggerVibration(); // ADDED VIBRATION TO RETRY
+                                _triggerVibration(); 
                                 if (_isGameFinished && !_isSuccess) {
-                                  // Retry (Clear All)
                                   setState(() {
                                     _isGameFinished = false;
                                     _selectedLetters.clear();
@@ -580,10 +614,9 @@ class _PlayGameScreenState extends State<PlayGameScreen> with WidgetsBindingObse
                           ),
                           SizedBox(width: 10),
                           
-                          // --- BACKSPACE BUTTON ---
                           GestureDetector(
-                            onTap: _onBackspace,     // Tap to delete one
-                            onLongPress: _onClearAll, // Long press to delete all
+                            onTap: _onBackspace, 
+                            onLongPress: _onClearAll, 
                             child: Container(
                               padding: EdgeInsets.all(12),
                               decoration: BoxDecoration(

@@ -23,6 +23,9 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
   String _difficulty = "easy";
   int _unlockedLevel = 1;
   bool _isLoading = true;
+  
+  // --- NEW: Map to store stars for each level ---
+  Map<int, int> _levelStars = {}; 
 
   @override
   void initState() {
@@ -34,12 +37,20 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
     String savedDiff = await _prefs.getSavedDifficulty();
     int unlocked = await _prefs.getUnlockedLevel();
     
+    // --- NEW: Load Stars for all levels ---
+    Map<int, int> loadedStars = {};
+    for (int i = 1; i <= 15; i++) {
+      int stars = await _prefs.getStarsForLevel(i);
+      loadedStars[i] = stars;
+    }
+
     if (savedDiff.isEmpty) savedDiff = "easy";
     
     if (mounted) {
       setState(() {
         _difficulty = savedDiff.toLowerCase();
         _unlockedLevel = unlocked;
+        _levelStars = loadedStars;
         _isLoading = false;
       });
     }
@@ -148,11 +159,10 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
                           IconButton(
                             icon: const Icon(Icons.settings, color: Colors.white, size: 30),
                             onPressed: () {
-                               // Push to settings, then RELOAD state when returning
                                Navigator.push(
                                   context,
                                   MaterialPageRoute(builder: (_) => const GameSettingsScreen()),
-                               ).then((_) => _loadState()); // <--- CRITICAL for refreshing locks
+                               ).then((_) => _loadState());
                             },
                           ),
                         ],
@@ -228,6 +238,8 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
 
   Widget _buildLevelButton(int level) {
     bool isLocked = level > _unlockedLevel;
+    // Get stars for this level (0 if not played/passed)
+    int starCount = _levelStars[level] ?? 0;
     
     return GestureDetector(
       onTap: () {
@@ -262,18 +274,27 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
         child: Stack(
           alignment: Alignment.center,
           children: [
-            if (!isLocked)
+            // --- UPDATED: BIG STARS AT TOP ---
+            if (!isLocked && starCount > 0)
               Positioned(
-                top: 8,
+                top: 5,
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
-                  children: List.generate(3, (index) => const Icon(Icons.star, color: Colors.amber, size: 16)),
+                  children: List.generate(3, (index) {
+                    // Only show filled stars if index < starCount
+                    return Icon(
+                      index < starCount ? Icons.star : Icons.star_border, 
+                      color: index < starCount ? Colors.amber : Colors.white30, 
+                      size: 22, // Bigger stars
+                    );
+                  }),
                 ),
               ),
+              
             isLocked
                 ? const Icon(Icons.lock, color: Colors.white70, size: 40)
                 : Padding(
-                  padding: const EdgeInsets.only(top: 12.0),
+                  padding: const EdgeInsets.only(top: 15.0), // Pushed down slightly to make room for stars
                   child: Text(
                       "$level",
                       style: const TextStyle(
