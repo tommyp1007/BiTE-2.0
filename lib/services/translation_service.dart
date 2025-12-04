@@ -26,13 +26,27 @@ class TranslationService {
 
     bool hasInternet = await _isNetworkAvailable();
 
+    String result;
     if (hasInternet) {
       String targetCode = _getLanguageCode(toLang);
       String sourceCode = _getLanguageCode(fromLang);
-      return await _translateOnline(text, sourceCode, targetCode);
+      result = await _translateOnline(text, sourceCode, targetCode);
     } else {
-      return await _translateOffline(text, fromLang, toLang);
+      result = await _translateOffline(text, fromLang, toLang);
     }
+
+    // --- NEW FALLBACK LOGIC ---
+    // If the API returns the exact same string (case-insensitive), it likely means
+    // it couldn't find a translation (common for names or unknown words).
+    // If it's a SINGLE WORD, return your specific message.
+    bool isSingleWord = text.trim().split(RegExp(r'\s+')).length == 1;
+    
+    // We compare lowercase trimmed versions to detect "not translated" scenarios
+    if (result.trim().toLowerCase() == text.trim().toLowerCase() && isSingleWord) {
+      return "Translation is soon to add";
+    }
+
+    return result;
   }
 
   String _getLanguageCode(String language) {
@@ -42,12 +56,7 @@ class TranslationService {
   }
 
   Future<bool> _isNetworkAvailable() async {
-    // Check connectivity status
     var connectivityResult = await (Connectivity().checkConnectivity());
-    // Handle list return type in newer connectivity_plus versions, or single in older
-    if (connectivityResult is List) {
-       return !connectivityResult.contains(ConnectivityResult.none);
-    }
     return connectivityResult != ConnectivityResult.none;
   }
 
@@ -63,16 +72,7 @@ class TranslationService {
         if (data.containsKey('data') &&
             data['data']['translations'] != null &&
             data['data']['translations'].isNotEmpty) {
-          
-          String translatedText = data['data']['translations'][0]['translatedText'];
-
-          // UPDATED LOGIC: Check if it returned the same word for single word input
-          bool isSingleWord = text.trim().split(RegExp(r'\s+')).length == 1;
-          if (isSingleWord && translatedText.toLowerCase() == text.toLowerCase()) {
-             return "Translation is soon to add";
-          }
-          
-          return translatedText;
+          return data['data']['translations'][0]['translatedText'];
         }
       }
       return "Error: ${response.statusCode}";
@@ -85,24 +85,13 @@ class TranslationService {
     fromLang = fromLang.toLowerCase();
     toLang = toLang.toLowerCase();
 
-    String result = "";
     try {
       if (fromLang == 'english' && toLang == 'malay') {
-        result = await _englishToMalay.translateText(text);
+        return await _englishToMalay.translateText(text);
       } else if (fromLang == 'malay' && toLang == 'english') {
-        result = await _malayToEnglish.translateText(text);
-      } else {
-        return "Offline model not found for this pair.";
+        return await _malayToEnglish.translateText(text);
       }
-
-      // UPDATED LOGIC: Check if ML Kit returned same word for single word input
-      bool isSingleWord = text.trim().split(RegExp(r'\s+')).length == 1;
-      if (isSingleWord && result.toLowerCase() == text.toLowerCase()) {
-          return "Translation is soon to add";
-      }
-
-      return result;
-
+      return "Offline model not found for this pair.";
     } catch (e) {
       return "Translation failed: $e";
     }
