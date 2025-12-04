@@ -100,7 +100,7 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
       if (query.isNotEmpty) {
         _handleTranslate();
       } else {
-        if (mounted) setState(() { _translatedText = ""; _isResultVisible = false; });
+        if(mounted) setState(() { _translatedText = ""; _isResultVisible = false; });
       }
     });
   }
@@ -121,35 +121,58 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
     String result = "";
 
     // ==========================================
-    // STRATEGY: SMART PIVOT TRANSLATION
+    // STRATEGY: DUAL PIVOT SYSTEM
     // ==========================================
 
-    // 1. BIDAYUH -> ENGLISH (Pivot via Malay)
-    // Why? Google Translate (Ms->En) is very good at fixing grammar.
+    // 1. BIDAYUH -> ENGLISH (Uses Malay Pivot)
+    // Structure of Bidayuh is closer to Malay. converting Bidayuh->Malay first is safer, 
+    // then letting Google handle Malay->English grammar.
     if (_fromLanguage == "Bidayuh" && _toLanguage == "English") {
+      // Step A: Get Rough Malay from DB
       String roughMalay = _getBidayuhTranslation(text, "bidayuh", "malay");
+      
       if (roughMalay == "Translation is soon to add") {
         result = roughMalay;
       } else {
+        // Step B: Send Rough Malay to API -> English
         result = await _translationService.translate(roughMalay, "Malay", "English");
       }
     }
     
-    // 2. BIDAYUH -> MALAY (Pivot via English) -- [NEW FIX]
-    // Why? Direct DB is "word-for-word". Converting to English first allows Google (En->Ms) to apply proper Malay grammar.
+    // 2. BIDAYUH -> MALAY (Uses English Pivot for Sentences)
+    // Direct word mapping is used for single words.
+    // For sentences, Bidayuh->English->Malay ensures formal grammar structure.
     else if (_fromLanguage == "Bidayuh" && _toLanguage == "Malay") {
-      String roughEnglish = _getBidayuhTranslation(text, "bidayuh", "english");
-      
-      if (roughEnglish == "Translation is soon to add") {
-        // Fallback to direct DB if English mapping is missing
+      // Check word count (excluding punctuation)
+      int wordCount = text.replaceAll(RegExp(r'[^\w\s]'), '').trim().split(RegExp(r'\s+')).length;
+
+      // SINGLE WORD: Use Direct Database (Accurate Vocab)
+      // e.g. "Akuk" -> "Saya"
+      if (wordCount <= 1) {
         result = _getBidayuhTranslation(text, "bidayuh", "malay");
-      } else {
-        // Send "Rough English" to API to get "Proper Malay"
-        result = await _translationService.translate(roughEnglish, "English", "Malay");
+      } 
+      // SENTENCE: Use English Pivot (Better Grammar)
+      // e.g. "Ani ndai" -> "What doing" -> "Apa yang awak buat"
+      else {
+        String roughEnglish = _getBidayuhTranslation(text, "bidayuh", "english");
+        
+        if (roughEnglish == "Translation is soon to add") {
+          // If English mapping missing, fallback to direct Malay DB
+          result = _getBidayuhTranslation(text, "bidayuh", "malay");
+        } else {
+          // Send Rough English to API -> Malay
+          result = await _translationService.translate(roughEnglish, "English", "Malay");
+          
+          // Safety net: If API fails, fall back to direct DB
+          if (result == "Translation is soon to add") {
+             result = _getBidayuhTranslation(text, "bidayuh", "malay");
+          }
+        }
       }
     }
 
-    // 3. ENGLISH -> BIDAYUH (Pivot via Malay)
+    // 3. ENGLISH -> BIDAYUH (Uses Malay Pivot)
+    // English -> Malay (API) -> Bidayuh (DB)
     else if (_fromLanguage == "English" && _toLanguage == "Bidayuh") {
       String properMalay = await _translationService.translate(text, "English", "Malay");
       if (properMalay == "Translation is soon to add") {
@@ -160,7 +183,6 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
     }
 
     // 4. MALAY -> BIDAYUH (Direct DB)
-    // Malay structure is closest to Bidayuh, so direct mapping is usually acceptable.
     else if (_fromLanguage == "Malay" && _toLanguage == "Bidayuh") {
       result = _getBidayuhTranslation(text, "malay", "bidayuh");
     }
@@ -181,7 +203,7 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
   String _getBidayuhTranslation(String text, String fromLang, String toLang) {
     if (text.trim().isEmpty) return "";
 
-    // Separate punctuation into tokens
+    // Separate punctuation
     String spacedText = text.replaceAllMapped(RegExp(r'([^\w\s]|_)'), (match) {
       return ' ${match.group(0)} ';
     });
@@ -254,7 +276,6 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
     }
 
     String rawResult = translatedParts.join(" ");
-    // Remove space before punctuation
     return rawResult.replaceAllMapped(RegExp(r'\s+([^\w\s])'), (match) {
       return match.group(1)!;
     });
@@ -288,7 +309,6 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
               Expanded(
                 child: Stack(
                   children: [
-                    // Main Content Card
                     Container(
                       margin: EdgeInsets.only(top: 10),
                       padding: EdgeInsets.only(bottom: 70),
@@ -351,8 +371,6 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
                         ],
                       ),
                     ),
-                    
-                    // Floating Language Bar
                     Positioned(
                       left: 0,
                       right: 0,
@@ -374,17 +392,14 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
                                 setState(() => _fromLanguage = val);
                                 if (_sourceController.text.isNotEmpty) _handleTranslate();
                               }),
-                              
                               IconButton(
                                 icon: Icon(Icons.swap_horiz, color: AppColors.primary, size: 28),
                                 onPressed: _swapLanguages,
                               ),
-                              
                               _buildLanguageButton(_toLanguage, (val) {
                                 setState(() => _toLanguage = val);
                                 if (_sourceController.text.isNotEmpty) _handleTranslate();
                               }),
-
                               if (isKeyboardOpen)
                                 Container(
                                   margin: EdgeInsets.only(left: 8),

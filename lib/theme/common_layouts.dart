@@ -1,6 +1,6 @@
-import 'dart:io'; // 1. CRITICAL IMPORT: This is required for exit(0) to work on iOS
+import 'dart:io'; 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // Required for SystemNavigator on Android
+import 'package:flutter/services.dart';
 import '../theme/app_colors.dart';
 import '../screens/home_screen.dart';
 
@@ -55,7 +55,7 @@ class AppHeader extends StatelessWidget {
   }
 }
 
-// --- Bottom Panel (Fixed for iOS) ---
+// --- Bottom Panel (Android Only Exit Button) ---
 class BottomNavPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -72,7 +72,6 @@ class BottomNavPanel extends StatelessWidget {
               Expanded(
                 child: GestureDetector(
                   onTap: () {
-                    // Navigate to Home and remove all previous routes to prevent back button loops
                     Navigator.pushAndRemoveUntil(
                       context, 
                       MaterialPageRoute(builder: (_) => HomeScreen()), 
@@ -89,31 +88,24 @@ class BottomNavPanel extends StatelessWidget {
                   ),
                 ),
               ),
-              
-              // Exit Button
-              Expanded(
-                child: GestureDetector(
-                  onTap: () {
-                    if (Platform.isAndroid) {
-                      // Standard Android exit
-                      SystemNavigator.pop();
-                    } else if (Platform.isIOS) {
-                      // iOS FORCE EXIT
-                      // Apple does not support "SystemNavigator.pop".
-                      // We must use exit(0) from 'dart:io' to kill the process.
-                      exit(0);
-                    }
-                  },
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Image.asset('assets/images/exit_icon.png', width: 40, height: 40, fit: BoxFit.scaleDown),
-                      SizedBox(height: 4),
-                      Text("Exit", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
-                    ],
+
+              // 🚫 Exit button removed for iOS (Apple does not allow app exit)
+              if (Platform.isAndroid)
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      SystemNavigator.pop(); // Android exit
+                    },
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Image.asset('assets/images/exit_icon.png', width: 40, height: 40, fit: BoxFit.scaleDown),
+                        SizedBox(height: 4),
+                        Text("Exit", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
         ),

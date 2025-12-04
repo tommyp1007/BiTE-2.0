@@ -38,9 +38,6 @@ class TranslationService {
     }
 
     // --- FALLBACK LOGIC ---
-    // If the result is empty (API failed), return the error.
-    // If result is identical to input, we ALLOW it now (e.g. "Hello" -> "Hello")
-    // unless it is the explicit default failure message.
     if (result.trim().isEmpty || result == "Translation is soon to add") {
       return "Translation is soon to add";
     }
@@ -76,7 +73,6 @@ class TranslationService {
           return _unescapeHtml(raw);
         }
       }
-      // If API fails with error, return special string to trigger fallback
       return "Translation is soon to add"; 
     } catch (e) {
       return "Translation is soon to add";
