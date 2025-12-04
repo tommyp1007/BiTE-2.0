@@ -1,4 +1,5 @@
-platform :ios, '13.0'
+# Set the platform to iOS 15.0 to match Firebase requirements
+platform :ios, '15.0'
 
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
 
@@ -33,5 +34,9 @@ end
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
+    # FORCE all pods to use iOS 15.0 to avoid deployment target mismatch errors
+    target.build_configurations.each do |config|
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+    end
   end
 end

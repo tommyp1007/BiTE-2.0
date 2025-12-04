@@ -34,7 +34,7 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
   Future<void> _fetchTranslationsFromFirestore() async {
     try {
       final snapshot = await _db.collection("bidayuh_words").get();
-      
+
       for (var doc in snapshot.docs) {
         final data = doc.data();
         String? word = data['word'];
@@ -85,8 +85,8 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
   }
 
   void _handleTranslate() async {
-    // --- UPDATED: THIS LINE DISMISSES THE KEYBOARD ---
-    FocusScope.of(context).unfocus(); 
+    // Dismiss keyboard
+    FocusScope.of(context).unfocus();
 
     String text = _sourceController.text.trim().toLowerCase();
     if (text.isEmpty) {
@@ -98,89 +98,123 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
     }
 
     if (_fromLanguage == _toLanguage) {
-       setState(() {
+      setState(() {
         _translatedText = "Unsupported translation pair.";
         _isResultVisible = true;
       });
       return;
     }
 
+    // Custom Bidayuh Logic
     if (_fromLanguage == "Bidayuh" || _toLanguage == "Bidayuh") {
-      String result = _getBidayuhTranslation(text, _fromLanguage.toLowerCase(), _toLanguage.toLowerCase());
+      String result = _getBidayuhTranslation(
+          text, _fromLanguage.toLowerCase(), _toLanguage.toLowerCase());
       setState(() {
-        _translatedText = result.isNotEmpty ? result : "Translation not found.";
+        _translatedText = result;
         _isResultVisible = true;
       });
       return;
     }
 
+    // External API Logic (Google/ML Kit)
     setState(() {
       _translatedText = "Translating...";
       _isResultVisible = true;
     });
 
     String result = await _translationService.translate(text, _fromLanguage, _toLanguage);
-    
+
     if (mounted) {
       setState(() => _translatedText = result);
     }
   }
 
   String _getBidayuhTranslation(String text, String fromLang, String toLang) {
+    // 1. Clean input
     String cleanedText = text.replaceAll(RegExp(r'[^a-zA-Z0-9\s]'), '').trim();
+    // Keep punctuation to append at the end
     String punctuation = text.replaceAll(RegExp(r'[a-zA-Z0-9\s]'), '');
 
-    List<String> words = cleanedText.split(RegExp(r'\s+'));
+    if (cleanedText.isEmpty) return "Please enter valid text";
+
+    // Split text into list of words to check if it is a sentence or single word
+    List<String> originalWords = cleanedText.split(RegExp(r'\s+'));
+    
+    // CHECK: Is the input just one word?
+    bool isSingleWordInput = originalWords.length == 1;
+
+    List<String> words = List.from(originalWords); // Create a mutable copy for processing
     List<String> translatedParts = [];
 
+    // 2. Loop through words
     while (words.isNotEmpty) {
       String? phrase;
       String singleWord = words[0];
+      int wordsUsed = 0;
 
+      // Try to find the longest matching phrase first
       for (int i = words.length; i > 0; i--) {
         String potentialPhrase = words.sublist(0, i).join(" ");
-        
+
         if (fromLang == 'bidayuh' && toLang == 'english') {
           if (_bidayuhToEnglishDict.containsKey(potentialPhrase)) {
             phrase = _bidayuhToEnglishDict[potentialPhrase];
-            words = words.sublist(i);
-            break; 
+            wordsUsed = i;
+            break;
           }
         } else if (fromLang == 'bidayuh' && toLang == 'malay') {
           if (_bidayuhToMalayDict.containsKey(potentialPhrase)) {
             phrase = _bidayuhToMalayDict[potentialPhrase];
-            words = words.sublist(i);
+            wordsUsed = i;
             break;
           }
         } else if (fromLang == 'english' && toLang == 'bidayuh') {
           if (_englishToBidayuhDict.containsKey(potentialPhrase)) {
             phrase = _englishToBidayuhDict[potentialPhrase];
-            words = words.sublist(i);
+            wordsUsed = i;
             break;
           }
         } else if (fromLang == 'malay' && toLang == 'bidayuh') {
           if (_malayToBidayuhDict.containsKey(potentialPhrase)) {
             phrase = _malayToBidayuhDict[potentialPhrase];
-            words = words.sublist(i);
+            wordsUsed = i;
             break;
           }
         }
       }
 
+      // 3. Fallback to single word if phrase not found
       if (phrase == null) {
         if (fromLang == 'bidayuh' && toLang == 'english') {
-           phrase = _bidayuhToEnglishDict[singleWord] ?? singleWord;
+          phrase = _bidayuhToEnglishDict[singleWord];
         } else if (fromLang == 'bidayuh' && toLang == 'malay') {
-           phrase = _bidayuhToMalayDict[singleWord] ?? singleWord;
+          phrase = _bidayuhToMalayDict[singleWord];
         } else if (fromLang == 'english' && toLang == 'bidayuh') {
-           phrase = _englishToBidayuhDict[singleWord] ?? singleWord;
+          phrase = _englishToBidayuhDict[singleWord];
         } else if (fromLang == 'malay' && toLang == 'bidayuh') {
-           phrase = _malayToBidayuhDict[singleWord] ?? singleWord;
+          phrase = _malayToBidayuhDict[singleWord];
         }
-        if (words.isNotEmpty) words.removeAt(0);
+        wordsUsed = 1;
       }
-      
-      if (phrase != null) translatedParts.add(phrase);
+
+      // 4. Combined Logic for Not Found
+      if (phrase != null) {
+        translatedParts.add(phrase);
+      } else {
+        // Word not found
+        if (isSingleWordInput) {
+          // If the user only typed ONE word, and it wasn't found, return specific error
+          return "Translation is soon to add";
+        } else {
+          // If the user typed a SENTENCE, and this specific word wasn't found, use "_"
+          translatedParts.add("_");
+        }
+      }
+
+      // Remove the processed words from the list
+      if (words.isNotEmpty) {
+        words.removeRange(0, wordsUsed > 0 ? wordsUsed : 1);
+      }
     }
 
     return translatedParts.join(" ") + punctuation;
@@ -190,19 +224,14 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.primary,
-      
-      // Setting this to false stops the keyboard from pushing widgets up.
-      // The keyboard will instead overlay on top of the bottom widgets.
-      resizeToAvoidBottomInset: false, 
-      
+      resizeToAvoidBottomInset: false,
+
       body: SafeArea(
         child: Column(
           children: [
             // App Header
             AppHeader(title: "BiTE Translator"),
-            
-            // Expanded allows the SingleChildScrollView to take all available space
-            // between the Header and the BottomNavPanel
+
             Expanded(
               child: SingleChildScrollView(
                 physics: BouncingScrollPhysics(),
@@ -210,27 +239,39 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
                   children: [
                     SizedBox(height: 20),
                     Text(
-                      "Text Translator", 
-                      style: TextStyle(color: AppColors.white, fontSize: 24, fontWeight: FontWeight.bold)
+                      "Text Translator",
+                      style: TextStyle(
+                          color: AppColors.white,
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold),
                     ),
-                    
+
                     // Language Spinners
                     Container(
                       margin: EdgeInsets.fromLTRB(20, 40, 20, 0),
                       padding: EdgeInsets.symmetric(horizontal: 5),
-                      decoration: BoxDecoration(color: AppColors.white, borderRadius: BorderRadius.circular(15)), 
+                      decoration: BoxDecoration(
+                          color: AppColors.white,
+                          borderRadius: BorderRadius.circular(15)),
                       child: Row(
                         children: [
-                          Expanded(child: _buildDropdown((v) => setState(() => _fromLanguage = v!), _fromLanguage)),
+                          Expanded(
+                              child: _buildDropdown(
+                                  (v) => setState(() => _fromLanguage = v!),
+                                  _fromLanguage)),
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 10),
-                            child: Icon(Icons.compare_arrows, color: Colors.black, size: 24), 
+                            child: Icon(Icons.compare_arrows,
+                                color: Colors.black, size: 24),
                           ),
-                          Expanded(child: _buildDropdown((v) => setState(() => _toLanguage = v!), _toLanguage)),
+                          Expanded(
+                              child: _buildDropdown(
+                                  (v) => setState(() => _toLanguage = v!),
+                                  _toLanguage)),
                         ],
                       ),
                     ),
-                    
+
                     // Input Field
                     Padding(
                       padding: EdgeInsets.fromLTRB(20, 20, 20, 0),
@@ -242,51 +283,65 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
                           hintText: "Enter your text",
                           filled: true,
                           fillColor: AppColors.white,
-                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
-                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+                          enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(15),
+                              borderSide: BorderSide.none),
+                          focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(15),
+                              borderSide: BorderSide.none),
                           hintStyle: TextStyle(color: AppColors.secondary),
                         ),
                       ),
                     ),
-                    
+
                     // Translate Button
                     Container(
                       width: double.infinity,
                       padding: EdgeInsets.fromLTRB(20, 20, 20, 0),
                       child: ElevatedButton(
-                        onPressed: _isLoadingDictionaries ? null : _handleTranslate,
+                        onPressed:
+                            _isLoadingDictionaries ? null : _handleTranslate,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.secondary, 
-                          padding: EdgeInsets.symmetric(vertical: 10),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))
-                        ),
-                        child: _isLoadingDictionaries 
-                          ? SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                          : Text("Translate", style: TextStyle(fontSize: 20, color: AppColors.white)),
+                            backgroundColor: AppColors.secondary,
+                            padding: EdgeInsets.symmetric(vertical: 10),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(15))),
+                        child: _isLoadingDictionaries
+                            ? SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                    color: Colors.white, strokeWidth: 2))
+                            : Text("Translate",
+                                style: TextStyle(
+                                    fontSize: 20, color: AppColors.white)),
                       ),
                     ),
-                    
+
                     // Result Display
                     if (_isResultVisible)
                       Container(
                         margin: EdgeInsets.fromLTRB(20, 10, 20, 20),
                         padding: EdgeInsets.all(16),
                         width: double.infinity,
-                        decoration: BoxDecoration(color: AppColors.white, borderRadius: BorderRadius.circular(15)),
+                        decoration: BoxDecoration(
+                            color: AppColors.white,
+                            borderRadius: BorderRadius.circular(15)),
                         child: Text(
-                          _translatedText, 
-                          style: TextStyle(fontSize: 17, color: AppColors.primary, letterSpacing: 0.03), 
-                          textAlign: TextAlign.center
+                          _translatedText,
+                          style: TextStyle(
+                              fontSize: 17,
+                              color: AppColors.primary,
+                              letterSpacing: 0.03),
+                          textAlign: TextAlign.center,
                         ),
                       ),
                   ],
                 ),
               ),
             ),
-            
-            // Bottom Panel remains fixed at the bottom.
-            // Since resizeToAvoidBottomInset is false, the keyboard will cover this 
-            // instead of pushing it up.
+
+            // Bottom Panel
             BottomNavPanel(),
           ],
         ),
@@ -299,7 +354,10 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
       child: DropdownButton<String>(
         value: val,
         isExpanded: true,
-        items: ["English", "Malay", "Bidayuh"].map((e) => DropdownMenuItem(value: e, child: Center(child: Text(e)))).toList(),
+        items: ["English", "Malay", "Bidayuh"]
+            .map((e) =>
+                DropdownMenuItem(value: e, child: Center(child: Text(e))))
+            .toList(),
         onChanged: onChanged,
       ),
     );

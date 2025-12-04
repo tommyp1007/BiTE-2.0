@@ -60,7 +60,7 @@ class TranslationService {
             data['data']['translations'].isNotEmpty) {
           return data['data']['translations'][0]['translatedText'];
         }
-      } 
+      }
       return "Error: ${response.statusCode}";
     } catch (e) {
       return "Network error: $e";
