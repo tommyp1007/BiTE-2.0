@@ -1,3 +1,4 @@
+import 'dart:async'; // Required for StreamSubscription
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -20,6 +21,9 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
+  // Real-time listener
+  StreamSubscription<DocumentSnapshot>? _userStream;
+
   String _difficulty = "easy";
   int _unlockedLevel = 1;
   bool _isLoading = true;
@@ -30,14 +34,21 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
   @override
   void initState() {
     super.initState();
-    _loadState();
+    _loadLocalState();      // Load fast from device first
+    _setupRealtimeSync();   // Then listen to the cloud for live updates
   }
 
-  void _loadState() async {
+  @override
+  void dispose() {
+    _userStream?.cancel(); // Stop listening when screen closes to save battery/data
+    super.dispose();
+  }
+
+  // 1. Load what we have on the phone immediately
+  void _loadLocalState() async {
     String savedDiff = await _prefs.getSavedDifficulty();
     int unlocked = await _prefs.getUnlockedLevel();
     
-    // Load Stars for all levels
     Map<int, int> loadedStars = {};
     for (int i = 1; i <= 15; i++) {
       int stars = await _prefs.getStarsForLevel(i);
@@ -56,23 +67,59 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
     }
   }
 
-  void _updateDifficulty(String newDifficulty) async {
-    setState(() {
-      _difficulty = newDifficulty;
-    });
+  // 2. REAL-TIME SYNC: Listen to changes from Firebase
+  void _setupRealtimeSync() {
+    User? user = _auth.currentUser;
+    if (user != null) {
+      _userStream = _db.collection('users').doc(user.uid).snapshots().listen((snapshot) async {
+        if (snapshot.exists && mounted) {
+          Map<String, dynamic> data = snapshot.data() as Map<String, dynamic>;
 
+          // A. Sync Unlocked Level
+          int cloudUnlocked = data['unlockedLevel'] ?? 1;
+          await _prefs.setUnlockedLevel(cloudUnlocked); // Save to local
+
+          // B. Sync Difficulty
+          String cloudDiff = data['difficulty'] ?? 'easy';
+          await _prefs.saveDifficulty(cloudDiff);
+
+          // C. Sync Stars
+          Map<int, int> cloudStars = {};
+          if (data.containsKey('levelStars')) {
+            Map<String, dynamic> starsMap = data['levelStars'];
+            
+            for (var entry in starsMap.entries) {
+              int lvl = int.tryParse(entry.key) ?? 0;
+              int count = entry.value as int;
+              if (lvl > 0) {
+                cloudStars[lvl] = count;
+                await _prefs.setStarsForLevel(lvl, count); // Save to local
+              }
+            }
+          }
+
+          // D. Update UI
+          setState(() {
+            _unlockedLevel = cloudUnlocked;
+            _difficulty = cloudDiff;
+            _levelStars = cloudStars;
+          });
+        }
+      }, onError: (e) {
+        print("Real-time Sync Error: $e");
+      });
+    }
+  }
+
+  // Update difficulty (Writes to Firestore, Listener will handle the UI update)
+  void _updateDifficulty(String newDifficulty) async {
+    // Optimistic Update (Update UI immediately)
+    setState(() => _difficulty = newDifficulty);
     await _prefs.saveDifficulty(newDifficulty);
 
     User? user = _auth.currentUser;
     if (user != null) {
-      _db.collection('users').doc(user.uid).update({'difficulty': newDifficulty})
-        .catchError((e) {
-          if (mounted) {
-             ScaffoldMessenger.of(context).showSnackBar(
-               SnackBar(content: Text("Failed to sync difficulty: $e"))
-             );
-          }
-        });
+      _db.collection('users').doc(user.uid).update({'difficulty': newDifficulty});
     }
   }
 
@@ -84,12 +131,9 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
 
   Color _getDifficultyColor() {
     switch (_difficulty) {
-      case 'medium':
-        return Colors.orange;
-      case 'hard':
-        return Colors.red;    
-      default:
-        return Colors.green;  
+      case 'medium': return Colors.orange;
+      case 'hard': return Colors.red;    
+      default: return Colors.green;  
     }
   }
 
@@ -162,7 +206,9 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
                                Navigator.push(
                                   context,
                                   MaterialPageRoute(builder: (_) => const GameSettingsScreen()),
-                               ).then((_) => _loadState());
+                               );
+                               // Note: We don't strictly need .then(_loadState) anymore because the StreamListener
+                               // will automatically detect changes made in Settings (like resets).
                             },
                           ),
                         ],
@@ -238,10 +284,9 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
 
   Widget _buildLevelButton(int level) {
     bool isLocked = level > _unlockedLevel;
-    // Get stars for this level (0 if not played/passed)
     int starCount = _levelStars[level] ?? 0;
     
-    // Check if we actually have stars to display
+    // Logic: Only show stars if unlocked AND we have stars recorded
     bool hasStars = !isLocked && starCount > 0;
     
     return GestureDetector(
@@ -256,7 +301,7 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
           Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => PlayGameScreen(level: level)),
-          ).then((_) => _loadState());
+          );
         }
       },
       child: Container(
@@ -277,28 +322,27 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
         child: Stack(
           alignment: Alignment.center,
           children: [
-            // --- STARS (Only if unlocked and played) ---
+            // Stars at the top
             if (hasStars)
               Positioned(
-                top: 8,
+                top: 5,
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: List.generate(3, (index) {
                     return Icon(
                       index < starCount ? Icons.star : Icons.star_border, 
                       color: index < starCount ? Colors.amber : Colors.white30, 
-                      size: 20, 
+                      size: 22, 
                     );
                   }),
                 ),
               ),
               
-            // --- MAIN ICON / NUMBER ---
+            // Center Content
             isLocked
                 ? const Icon(Icons.lock, color: Colors.white70, size: 40)
                 : Padding(
-                    // IF we have stars -> Add padding to push number down.
-                    // IF NO stars -> Padding is 0, keeping it perfectly centered.
+                    // If stars exist, push text down. If not, 0 padding (center).
                     padding: EdgeInsets.only(top: hasStars ? 22.0 : 0.0), 
                     child: Text(
                         "$level",

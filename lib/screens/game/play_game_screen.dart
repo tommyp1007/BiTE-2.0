@@ -38,7 +38,7 @@ class _PlayGameScreenState extends State<PlayGameScreen> with WidgetsBindingObse
   bool _showHint = false;
   String _hintText = "";
   
-  // --- NEW: Hint Tracking ---
+  // --- Hint Tracking ---
   int _hintsUsed = 0; 
 
   // --- Settings State ---
@@ -287,7 +287,7 @@ class _PlayGameScreenState extends State<PlayGameScreen> with WidgetsBindingObse
     }
   }
 
-  // --- UPDATED: Star Calculation Logic ---
+  // --- STAR CALCULATION & DATA SAVING ---
   void _handleCorrectAnswer() async {
     setState(() {
       _isGameFinished = true;
@@ -295,6 +295,9 @@ class _PlayGameScreenState extends State<PlayGameScreen> with WidgetsBindingObse
     });
 
     // 1. Calculate Stars
+    // 1-3 hints = 3 stars
+    // 4-8 hints = 2 stars
+    // >8 hints  = 1 star
     int starsEarned;
     if (_hintsUsed <= 3) {
       starsEarned = 3;
@@ -305,9 +308,6 @@ class _PlayGameScreenState extends State<PlayGameScreen> with WidgetsBindingObse
     }
 
     // 2. Save Stars Locally
-    // We only update if the new star count is higher than previous best, OR just overwrite since user replayed?
-    // User requirement implies "reset" resets everything, but replaying usually updates.
-    // Let's always save the latest result for simplicity.
     await _prefs.setStarsForLevel(_currentLevel, starsEarned);
 
     // 3. Unlock Next Level Logic
@@ -316,12 +316,12 @@ class _PlayGameScreenState extends State<PlayGameScreen> with WidgetsBindingObse
       await _prefs.setUnlockedLevel(_currentLevel + 1);
     }
 
-    // 4. Save to Firestore
+    // 4. Save to Firestore (Real-time sync)
     User? user = _auth.currentUser;
     if (user != null) {
       Map<String, dynamic> updateData = {
         'unlockedLevel': (_currentLevel >= unlockedLevel) ? _currentLevel + 1 : unlockedLevel,
-        // Update levelStars map. We use dot notation for nested fields or Merge
+        // Using 'levelStars.$level' to update specific key in the map
         'levelStars.$_currentLevel': starsEarned
       };
       
@@ -485,11 +485,13 @@ class _PlayGameScreenState extends State<PlayGameScreen> with WidgetsBindingObse
                             children: [
                               Image.asset('assets/images/correct.png', height: 40),
                               Text("Correct! Well done.", style: TextStyle(color: Colors.greenAccent, fontSize: 18, fontWeight: FontWeight.bold)),
-                              // --- Show Stars Earned Immediately ---
+                              
+                              // --- DISPLAY STARS EARNED ---
                               SizedBox(height: 5),
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: List.generate(3, (index) {
+                                  // Recalculate just for display (logic matches _handleCorrectAnswer)
                                   int stars = 1;
                                   if (_hintsUsed <= 3) stars = 3;
                                   else if (_hintsUsed <= 8) stars = 2;
@@ -497,7 +499,7 @@ class _PlayGameScreenState extends State<PlayGameScreen> with WidgetsBindingObse
                                   return Icon(
                                     index < stars ? Icons.star : Icons.star_border,
                                     color: Colors.amber,
-                                    size: 30,
+                                    size: 30, // Big star for result
                                   );
                                 }),
                               )
@@ -593,6 +595,7 @@ class _PlayGameScreenState extends State<PlayGameScreen> with WidgetsBindingObse
                               onPressed: () {
                                 _triggerVibration(); 
                                 if (_isGameFinished && !_isSuccess) {
+                                  // Retry (Clear All)
                                   setState(() {
                                     _isGameFinished = false;
                                     _selectedLetters.clear();
@@ -614,6 +617,7 @@ class _PlayGameScreenState extends State<PlayGameScreen> with WidgetsBindingObse
                           ),
                           SizedBox(width: 10),
                           
+                          // --- Backspace / Clear All ---
                           GestureDetector(
                             onTap: _onBackspace, 
                             onLongPress: _onClearAll, 
