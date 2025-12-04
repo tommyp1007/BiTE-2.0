@@ -20,6 +20,7 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
   bool _isResultVisible = false;
   bool _isLoadingDictionaries = true;
 
+  // Local Dictionaries for Bidayuh
   final Map<String, String> _bidayuhToEnglishDict = {};
   final Map<String, String> _bidayuhToMalayDict = {};
   final Map<String, String> _englishToBidayuhDict = {};
@@ -132,27 +133,21 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
   String _getBidayuhTranslation(String text, String fromLang, String toLang) {
     // 1. Clean input
     String cleanedText = text.replaceAll(RegExp(r'[^a-zA-Z0-9\s]'), '').trim();
-    // Keep punctuation to append at the end
     String punctuation = text.replaceAll(RegExp(r'[a-zA-Z0-9\s]'), '');
 
     if (cleanedText.isEmpty) return "Please enter valid text";
 
-    // Split text into list of words to check if it is a sentence or single word
     List<String> originalWords = cleanedText.split(RegExp(r'\s+'));
-    
-    // CHECK: Is the input just one word?
     bool isSingleWordInput = originalWords.length == 1;
 
-    List<String> words = List.from(originalWords); // Create a mutable copy for processing
+    List<String> words = List.from(originalWords); 
     List<String> translatedParts = [];
 
-    // 2. Loop through words
     while (words.isNotEmpty) {
       String? phrase;
       String singleWord = words[0];
       int wordsUsed = 0;
 
-      // Try to find the longest matching phrase first
       for (int i = words.length; i > 0; i--) {
         String potentialPhrase = words.sublist(0, i).join(" ");
 
@@ -183,7 +178,6 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
         }
       }
 
-      // 3. Fallback to single word if phrase not found
       if (phrase == null) {
         if (fromLang == 'bidayuh' && toLang == 'english') {
           phrase = _bidayuhToEnglishDict[singleWord];
@@ -197,21 +191,16 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
         wordsUsed = 1;
       }
 
-      // 4. Combined Logic for Not Found
       if (phrase != null) {
         translatedParts.add(phrase);
       } else {
-        // Word not found
         if (isSingleWordInput) {
-          // If the user only typed ONE word, and it wasn't found, return specific error
           return "Translation is soon to add";
         } else {
-          // If the user typed a SENTENCE, and this specific word wasn't found, use "_"
           translatedParts.add("_");
         }
       }
 
-      // Remove the processed words from the list
       if (words.isNotEmpty) {
         words.removeRange(0, wordsUsed > 0 ? wordsUsed : 1);
       }
@@ -225,11 +214,12 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
     return Scaffold(
       backgroundColor: AppColors.primary,
       resizeToAvoidBottomInset: false,
-
+      // Fixed: Moved BottomNavPanel to bottomNavigationBar for consistent layout
+      bottomNavigationBar: BottomNavPanel(),
       body: SafeArea(
+        bottom: false,
         child: Column(
           children: [
-            // App Header
             AppHeader(title: "BiTE Translator"),
 
             Expanded(
@@ -257,7 +247,11 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
                         children: [
                           Expanded(
                               child: _buildDropdown(
-                                  (v) => setState(() => _fromLanguage = v!),
+                                  (v) {
+                                    setState(() => _fromLanguage = v!);
+                                    // Optional: Trigger translate if source changes too
+                                    // if (_sourceController.text.isNotEmpty) _handleTranslate(); 
+                                  },
                                   _fromLanguage)),
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -266,7 +260,13 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
                           ),
                           Expanded(
                               child: _buildDropdown(
-                                  (v) => setState(() => _toLanguage = v!),
+                                  (v) {
+                                    setState(() => _toLanguage = v!);
+                                    // UPDATED: Auto-trigger translation when target language changes
+                                    if (_sourceController.text.isNotEmpty) {
+                                      _handleTranslate();
+                                    }
+                                  },
                                   _toLanguage)),
                         ],
                       ),
@@ -340,9 +340,6 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
                 ),
               ),
             ),
-
-            // Bottom Panel
-            BottomNavPanel(),
           ],
         ),
       ),

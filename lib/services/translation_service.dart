@@ -42,7 +42,12 @@ class TranslationService {
   }
 
   Future<bool> _isNetworkAvailable() async {
+    // Check connectivity status
     var connectivityResult = await (Connectivity().checkConnectivity());
+    // Handle list return type in newer connectivity_plus versions, or single in older
+    if (connectivityResult is List) {
+       return !connectivityResult.contains(ConnectivityResult.none);
+    }
     return connectivityResult != ConnectivityResult.none;
   }
 
@@ -58,7 +63,16 @@ class TranslationService {
         if (data.containsKey('data') &&
             data['data']['translations'] != null &&
             data['data']['translations'].isNotEmpty) {
-          return data['data']['translations'][0]['translatedText'];
+          
+          String translatedText = data['data']['translations'][0]['translatedText'];
+
+          // UPDATED LOGIC: Check if it returned the same word for single word input
+          bool isSingleWord = text.trim().split(RegExp(r'\s+')).length == 1;
+          if (isSingleWord && translatedText.toLowerCase() == text.toLowerCase()) {
+             return "Translation is soon to add";
+          }
+          
+          return translatedText;
         }
       }
       return "Error: ${response.statusCode}";
@@ -71,13 +85,24 @@ class TranslationService {
     fromLang = fromLang.toLowerCase();
     toLang = toLang.toLowerCase();
 
+    String result = "";
     try {
       if (fromLang == 'english' && toLang == 'malay') {
-        return await _englishToMalay.translateText(text);
+        result = await _englishToMalay.translateText(text);
       } else if (fromLang == 'malay' && toLang == 'english') {
-        return await _malayToEnglish.translateText(text);
+        result = await _malayToEnglish.translateText(text);
+      } else {
+        return "Offline model not found for this pair.";
       }
-      return "Offline model not found for this pair.";
+
+      // UPDATED LOGIC: Check if ML Kit returned same word for single word input
+      bool isSingleWord = text.trim().split(RegExp(r'\s+')).length == 1;
+      if (isSingleWord && result.toLowerCase() == text.toLowerCase()) {
+          return "Translation is soon to add";
+      }
+
+      return result;
+
     } catch (e) {
       return "Translation failed: $e";
     }
