@@ -6,12 +6,14 @@ class GameState {
   final int score;
   final String difficulty;
   final int unlockedLevel;
+  final Map<String, dynamic> levelStars;
 
   GameState({
     required this.level, 
     required this.score, 
     required this.difficulty, 
-    required this.unlockedLevel
+    required this.unlockedLevel,
+    required this.levelStars,
   });
 }
 
@@ -19,48 +21,49 @@ class GameDataManager {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
+  // Real-time Stream for Multi-device Sync
+  Stream<DocumentSnapshot>? getUserDataStream() {
+    User? user = _auth.currentUser;
+    if (user != null) {
+      return _firestore.collection("users").doc(user.uid).snapshots();
+    }
+    return null;
+  }
+
   // Save game state
   Future<void> saveGameState(int level, int score, String difficulty, int unlockedLevel) async {
     User? user = _auth.currentUser;
     if (user != null) {
       try {
-        await _firestore.collection("users").doc(user.uid).update({
+        await _firestore.collection("users").doc(user.uid).set({
           "currentLevel": level,
           "score": score,
           "difficulty": difficulty,
           "unlockedLevel": unlockedLevel
-        });
-        print("Game state saved successfully");
+        }, SetOptions(merge: true)); 
       } catch (e) {
         print("Error saving game state: $e");
       }
-    } else {
-      print("User not logged in");
     }
   }
 
-  // Load game state
-  Future<GameState?> loadGameState() async {
+  // Save Stars for a specific Level
+  Future<void> saveLevelStars(int level, int stars) async {
     User? user = _auth.currentUser;
     if (user != null) {
       try {
-        DocumentSnapshot doc = await _firestore.collection("users").doc(user.uid).get();
-        if (doc.exists) {
-          return GameState(
-            level: doc.get("currentLevel") ?? 1,
-            score: doc.get("score") ?? 0,
-            difficulty: doc.get("difficulty") ?? "easy",
-            unlockedLevel: doc.get("unlockedLevel") ?? 1
-          );
-        }
+        await _firestore.collection("users").doc(user.uid).set({
+          "levelStars": {
+            "$level": stars
+          }
+        }, SetOptions(merge: true));
       } catch (e) {
-        print("Error loading game state: $e");
+        print("Error saving stars: $e");
       }
     }
-    return null;
   }
 
-  // UPDATED RESET HELPER
+  // Reset Game Progress
   Future<void> resetGameProgress() async {
     User? user = _auth.currentUser;
     if (user != null) {
@@ -68,13 +71,11 @@ class GameDataManager {
         await _firestore.collection("users").doc(user.uid).update({
           "currentLevel": 1,
           "unlockedLevel": 1,
-          "score": 0,
-          "levelStars": {}, // Clear the stars map
+          "score": 0, 
+          "levelStars": {}, 
         });
-        print("Game progress reset successfully");
       } catch (e) {
         print("Error resetting game progress: $e");
-        throw e; 
       }
     }
   }

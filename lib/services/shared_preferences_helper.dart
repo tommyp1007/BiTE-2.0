@@ -4,7 +4,7 @@ class SharedPreferencesHelper {
   static const String _keyCurrentLevel = "current_level";
   static const String _keyDifficulty = "difficulty";
   static const String _keyUnlockedLevel = "unlocked_level";
-  static const String _keyLevelStarsPrefix = "level_stars_"; 
+  static const String _keyLevelStarsPrefix = "stars_level_";
 
   Future<void> setCurrentLevel(int level) async {
     final prefs = await SharedPreferences.getInstance();
@@ -48,22 +48,13 @@ class SharedPreferencesHelper {
     return prefs.getInt('$_keyLevelStarsPrefix$level') ?? 0;
   }
 
-  // --- NEW: Clears only game progress, keeps Settings ---
-  Future<void> resetGameProgressOnly() async {
+  Future<void> resetGameProgress() async {
     final prefs = await SharedPreferences.getInstance();
-    
-    // Reset Levels
-    await prefs.setInt(_keyUnlockedLevel, 1);
     await prefs.setInt(_keyCurrentLevel, 1);
-
-    // Clear Stars (Loop through all possible levels)
-    for (int i = 1; i <= 20; i++) { // Assuming max 20 levels to be safe
+    await prefs.setInt(_keyUnlockedLevel, 1);
+    
+    for(int i = 1; i <= 15; i++) {
       await prefs.remove('$_keyLevelStarsPrefix$i');
     }
-  }
-
-  Future<void> clearAllData() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
   }
 }

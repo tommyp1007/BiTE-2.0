@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:audioplayers/audioplayers.dart'; 
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:audioplayers/audioplayers.dart';
 import '../../theme/app_colors.dart';
 import '../../services/shared_preferences_helper.dart'; 
+import '../../services/game_data_manager.dart'; 
+// ⭐ Import GameLevelScreen to navigate back to it
+import 'game_level_screen.dart'; 
 
 class GameSettingsScreen extends StatefulWidget {
   final Function(double)? onBgmVolumeChanged;
@@ -24,13 +25,15 @@ class GameSettingsScreen extends StatefulWidget {
 }
 
 class _GameSettingsScreenState extends State<GameSettingsScreen> {
-  final AudioPlayer _testSfxPlayer = AudioPlayer();
-  final SharedPreferencesHelper _prefsHelper = SharedPreferencesHelper(); 
+  final AudioPlayer _settingsPlayer = AudioPlayer();
+  
+  // Helpers for Resetting Data
+  final GameDataManager _gameDataManager = GameDataManager();
+  final SharedPreferencesHelper _prefsHelper = SharedPreferencesHelper();
 
   double _bgmVolume = 0.5;
   double _sfxVolume = 1.0;
   bool _vibrationEnabled = true;
-  bool _isResetting = false; 
 
   @override
   void initState() {
@@ -38,10 +41,19 @@ class _GameSettingsScreenState extends State<GameSettingsScreen> {
     _loadSettings();
   }
 
-  @override
-  void dispose() {
-    _testSfxPlayer.dispose();
-    super.dispose();
+  // 🔥 REMOVED THE DUPLICATE dispose() METHOD HERE (Was line 45-49)
+  // @override
+  // void dispose() {
+  //   _settingsPlayer.dispose();
+  //   super.dispose();
+  // }
+
+  // --- AUDIO HELPER ---
+  void _playSound(String fileName, {double? volumeOverride}) async {
+    double vol = volumeOverride ?? _sfxVolume;
+    await _settingsPlayer.stop();
+    await _settingsPlayer.setVolume(vol);
+    await _settingsPlayer.play(AssetSource('audio/$fileName.mp3'));
   }
 
   void _loadSettings() async {
@@ -65,10 +77,6 @@ class _GameSettingsScreenState extends State<GameSettingsScreen> {
     if (widget.onSfxVolumeChanged != null) widget.onSfxVolumeChanged!(value);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble('sfx_volume', value);
-
-    await _testSfxPlayer.setVolume(value);
-    await _testSfxPlayer.stop();
-    await _testSfxPlayer.play(AssetSource('audio/pop.mp3'));
   }
 
   void _toggleVibration(bool value) async {
@@ -76,63 +84,78 @@ class _GameSettingsScreenState extends State<GameSettingsScreen> {
     widget.onVibrationChanged?.call(value);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('vibration_enabled', value);
-    if (value) HapticFeedback.mediumImpact();
+    if (value) {
+      HapticFeedback.mediumImpact();
+      _playSound('pop'); 
+    }
   }
 
-  // --- UPDATED RESET LOGIC ---
-  Future<void> _handleResetProgress() async {
-    bool? confirm = await showDialog<bool>(
+  // ⭐ RESET LOGIC: Confirmation Dialog
+  void _confirmReset() {
+    showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: Colors.white,
-        title: const Text("Reset Progress?", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
-        content: const Text("This will lock all levels and clear all stars. This action cannot be undone."),
+        title: const Text(
+          "Reset Progress?", 
+          style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)
+        ),
+        content: const Text(
+          "Are you SURE you want to reset your game progress? You will LOSE your current data. This action cannot be undone.",
+          style: TextStyle(color: Colors.black, fontSize: 16),
+        ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("Cancel", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
           ),
           ElevatedButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
             style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
-            child: const Text("Reset", style: TextStyle(color: Colors.white)),
-          ),
+            onPressed: () async {
+              Navigator.pop(ctx); // Close dialog
+              await _performReset();
+            },
+            child: const Text("Reset", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          )
         ],
       ),
     );
+  }
 
-    if (confirm != true) return;
+  // ⭐ RESET LOGIC: Execution & Navigation
+  Future<void> _performReset() async {
+    // 1. Reset Local Storage
+    await _prefsHelper.resetGameProgress();
+    
+    // 2. Reset Firebase (Cloud)
+    await _gameDataManager.resetGameProgress();
 
-    setState(() => _isResetting = true);
+    if (mounted) {
+      // 3. Play sound feedback
+      _playSound('correct'); 
 
-    try {
-      // 1. Reset Local Data (Using the new specific method)
-      await _prefsHelper.resetGameProgressOnly();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Game progress reset. Returning to Level Selection..."),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
+        )
+      );
 
-      // 2. Reset Firebase Firestore
-      User? user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
-          'unlockedLevel': 1,
-          'currentLevel': 1,
-          'levelStars': {}, // Clears the stars map in DB
-        });
-      }
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Game progress has been reset."))
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error resetting: $e"))
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isResetting = false);
+      // 4. Navigate back to GameLevelScreen automatically
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => GameLevelScreen()),
+        (Route<dynamic> route) => route.isFirst, // Keeps the Main Menu (if it exists) in the stack
+      );
     }
+  }
+
+  // This is the correct, singular definition of dispose()
+  @override
+  void dispose() {
+    _settingsPlayer.dispose();
+    super.dispose();
   }
 
   @override
@@ -142,6 +165,7 @@ class _GameSettingsScreenState extends State<GameSettingsScreen> {
       body: SafeArea(
         child: Column(
           children: [
+            // --- Header ---
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Row(
@@ -177,90 +201,87 @@ class _GameSettingsScreenState extends State<GameSettingsScreen> {
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: AppColors.secondary, width: 2),
                 ),
-                child: SingleChildScrollView(
-                  child: Column(
-                    children: [
-                      _buildSectionTitle("Music Volume"),
-                      Row(
-                        children: [
-                          const Icon(Icons.music_note, color: Colors.white),
-                          Expanded(
-                            child: Slider(
-                              value: _bgmVolume,
-                              min: 0.0,
-                              max: 1.0,
-                              activeColor: AppColors.secondary,
-                              inactiveColor: Colors.white30,
-                              onChanged: _updateBgmVolume,
-                            ),
-                          ),
-                          Text("${(_bgmVolume * 100).toInt()}%", style: const TextStyle(color: Colors.white)),
-                        ],
-                      ),
-                      
-                      const SizedBox(height: 30),
-                      
-                      _buildSectionTitle("Sound Effects"),
-                      Row(
-                        children: [
-                          const Icon(Icons.touch_app, color: Colors.white),
-                          Expanded(
-                            child: Slider(
-                              value: _sfxVolume,
-                              min: 0.0,
-                              max: 1.0,
-                              activeColor: AppColors.secondary,
-                              inactiveColor: Colors.white30,
-                              onChanged: _updateSfxVolume,
-                            ),
-                          ),
-                          Text("${(_sfxVolume * 100).toInt()}%", style: const TextStyle(color: Colors.white)),
-                        ],
-                      ),
-                      
-                      const SizedBox(height: 30),
-                      
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          _buildSectionTitle("Vibration"),
-                          Switch(
-                            value: _vibrationEnabled,
+                child: Column(
+                  children: [
+                    // --- BGM Volume ---
+                    _buildSectionTitle("Music Volume"),
+                    Row(
+                      children: [
+                        const Icon(Icons.music_note, color: Colors.white),
+                        Expanded(
+                          child: Slider(
+                            value: _bgmVolume,
+                            min: 0.0,
+                            max: 1.0,
                             activeColor: AppColors.secondary,
-                            onChanged: _toggleVibration,
+                            inactiveColor: Colors.white30,
+                            onChanged: _updateBgmVolume,
+                            onChangeEnd: (_) => _playSound('pop', volumeOverride: _bgmVolume),
                           ),
-                        ],
-                      ),
+                        ),
+                        Text("${(_bgmVolume * 100).toInt()}%", style: const TextStyle(color: Colors.white)),
+                      ],
+                    ),
 
-                      const SizedBox(height: 40),
-                      const Divider(color: Colors.white30),
-                      const SizedBox(height: 20),
+                    const SizedBox(height: 30),
 
-                      _isResetting 
-                        ? const CircularProgressIndicator(color: Colors.redAccent)
-                        : SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton.icon(
-                              onPressed: _handleResetProgress,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.redAccent.withOpacity(0.9),
-                                padding: const EdgeInsets.symmetric(vertical: 15),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                              ),
-                              icon: const Icon(Icons.delete_forever, color: Colors.white),
-                              label: const Text(
-                                "RESET GAME PROGRESS",
-                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
-                              ),
-                            ),
+                    // --- SFX Volume ---
+                    _buildSectionTitle("Sound Effects"),
+                    Row(
+                      children: [
+                        const Icon(Icons.touch_app, color: Colors.white),
+                        Expanded(
+                          child: Slider(
+                            value: _sfxVolume,
+                            min: 0.0,
+                            max: 1.0,
+                            activeColor: AppColors.secondary,
+                            inactiveColor: Colors.white30,
+                            onChanged: _updateSfxVolume,
+                            onChangeEnd: (_) => _playSound('pop', volumeOverride: _sfxVolume),
                           ),
-                      const SizedBox(height: 10),
-                      const Text(
-                        "Locks all levels and restarts from Level 1",
-                        style: TextStyle(color: Colors.white70, fontSize: 12, fontStyle: FontStyle.italic),
+                        ),
+                        Text("${(_sfxVolume * 100).toInt()}%", style: const TextStyle(color: Colors.white)),
+                      ],
+                    ),
+
+                    const SizedBox(height: 30),
+
+                    // --- Vibration Toggle ---
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _buildSectionTitle("Vibration"),
+                        Switch(
+                          value: _vibrationEnabled,
+                          activeColor: AppColors.secondary,
+                          onChanged: _toggleVibration,
+                        ),
+                      ],
+                    ),
+
+                    const Spacer(),
+                    
+                    // --- Reset Progress Button ---
+                    const Divider(color: Colors.white30),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: _confirmReset,
+                        icon: const Icon(Icons.delete_forever, color: Colors.white),
+                        label: const Text(
+                          "RESET GAME PROGRESS", 
+                          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.redAccent.shade700,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ),
