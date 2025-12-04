@@ -1,4 +1,4 @@
-import 'dart:async'; // Required for StreamSubscription
+import 'dart:async'; 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -28,23 +28,22 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
   int _unlockedLevel = 1;
   bool _isLoading = true;
   
-  // Map to store stars for each level
+  // This Map holds your stars. Key = Level ID, Value = Number of Stars
   Map<int, int> _levelStars = {}; 
 
   @override
   void initState() {
     super.initState();
-    _loadLocalState();      // Load fast from device first
-    _setupRealtimeSync();   // Then listen to the cloud for live updates
+    _loadLocalState();      
+    _setupRealtimeSync();   
   }
 
   @override
   void dispose() {
-    _userStream?.cancel(); // Stop listening when screen closes to save battery/data
+    _userStream?.cancel(); 
     super.dispose();
   }
 
-  // 1. Load what we have on the phone immediately
   void _loadLocalState() async {
     String savedDiff = await _prefs.getSavedDifficulty();
     int unlocked = await _prefs.getUnlockedLevel();
@@ -52,7 +51,7 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
     Map<int, int> loadedStars = {};
     for (int i = 1; i <= 15; i++) {
       int stars = await _prefs.getStarsForLevel(i);
-      loadedStars[i] = stars;
+      if (stars > 0) loadedStars[i] = stars;
     }
 
     if (savedDiff.isEmpty) savedDiff = "easy";
@@ -67,7 +66,7 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
     }
   }
 
-  // 2. REAL-TIME SYNC: Listen to changes from Firebase
+  // --- REAL-TIME SYNC FIXED (MERGE STRATEGY) ---
   void _setupRealtimeSync() {
     User? user = _auth.currentUser;
     if (user != null) {
@@ -75,34 +74,42 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
         if (snapshot.exists && mounted) {
           Map<String, dynamic> data = snapshot.data() as Map<String, dynamic>;
 
-          // A. Sync Unlocked Level
+          // 1. Sync Unlocked Level (Only update if cloud is higher)
           int cloudUnlocked = data['unlockedLevel'] ?? 1;
-          await _prefs.setUnlockedLevel(cloudUnlocked); // Save to local
-
-          // B. Sync Difficulty
-          String cloudDiff = data['difficulty'] ?? 'easy';
-          await _prefs.saveDifficulty(cloudDiff);
-
-          // C. Sync Stars
-          Map<int, int> cloudStars = {};
-          if (data.containsKey('levelStars')) {
-            Map<String, dynamic> starsMap = data['levelStars'];
-            
-            for (var entry in starsMap.entries) {
-              int lvl = int.tryParse(entry.key) ?? 0;
-              int count = entry.value as int;
-              if (lvl > 0) {
-                cloudStars[lvl] = count;
-                await _prefs.setStarsForLevel(lvl, count); // Save to local
-              }
-            }
+          if (cloudUnlocked > _unlockedLevel) {
+             _unlockedLevel = cloudUnlocked;
+             await _prefs.setUnlockedLevel(cloudUnlocked);
           }
 
-          // D. Update UI
+          // 2. Sync Difficulty
+          String cloudDiff = data['difficulty'] ?? 'easy';
+          _difficulty = cloudDiff;
+          await _prefs.saveDifficulty(cloudDiff);
+
+          // 3. Sync Stars (MERGE FIX)
+          // Start with existing local stars to prevent disappearing
+          Map<int, int> mergedStars = Map.from(_levelStars);
+          
+          if (data.containsKey('levelStars') && data['levelStars'] is Map) {
+            Map<dynamic, dynamic> starsMap = data['levelStars'];
+            
+            starsMap.forEach((key, value) {
+              int lvl = int.tryParse(key.toString()) ?? 0;
+              int count = int.tryParse(value.toString()) ?? 0;
+              
+              if (lvl > 0 && count > 0) {
+                // Update map and save to local storage
+                mergedStars[lvl] = count;
+                _prefs.setStarsForLevel(lvl, count); 
+              }
+            });
+          }
+
+          // 4. Update UI with the merged result
           setState(() {
-            _unlockedLevel = cloudUnlocked;
+            _unlockedLevel = cloudUnlocked > _unlockedLevel ? cloudUnlocked : _unlockedLevel;
             _difficulty = cloudDiff;
-            _levelStars = cloudStars;
+            _levelStars = mergedStars;
           });
         }
       }, onError: (e) {
@@ -111,9 +118,7 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
     }
   }
 
-  // Update difficulty (Writes to Firestore, Listener will handle the UI update)
   void _updateDifficulty(String newDifficulty) async {
-    // Optimistic Update (Update UI immediately)
     setState(() => _difficulty = newDifficulty);
     await _prefs.saveDifficulty(newDifficulty);
 
@@ -166,56 +171,27 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
                         children: [
                           GestureDetector(
                             onTap: () {
-                              Navigator.pushReplacement(
-                                context,
-                                MaterialPageRoute(builder: (_) => WordGuessEntryScreen()),
-                              );
+                              Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => WordGuessEntryScreen()));
                             },
                             child: Image.asset('assets/images/back_icon.png', width: 40),
                           ),
-                          
                           Column(
                             children: [
-                              const Text(
-                                "SELECT LEVEL",
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 32,
-                                  fontWeight: FontWeight.bold,
-                                  shadows: [Shadow(color: Colors.blue, offset: Offset(2, 2), blurRadius: 4)],
-                                ),
-                              ),
-                              Text(
-                                "${_difficulty.toUpperCase()} MODE",
-                                style: TextStyle(
-                                  color: _getDifficultyColor(), 
-                                  fontSize: 24,                 
-                                  fontWeight: FontWeight.bold,
-                                  shadows: const [
-                                    Shadow(color: Colors.white, offset: Offset(0, 1), blurRadius: 1),
-                                    Shadow(color: Colors.black12, offset: Offset(1, 1), blurRadius: 2)
-                                  ],
-                                ),
-                              ),
+                              const Text("SELECT LEVEL", style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold)),
+                              Text("${_difficulty.toUpperCase()} MODE", style: TextStyle(color: _getDifficultyColor(), fontSize: 24, fontWeight: FontWeight.bold)),
                             ],
                           ),
-                          
                           IconButton(
                             icon: const Icon(Icons.settings, color: Colors.white, size: 30),
                             onPressed: () {
-                               Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (_) => const GameSettingsScreen()),
-                               );
-                               // Note: We don't strictly need .then(_loadState) anymore because the StreamListener
-                               // will automatically detect changes made in Settings (like resets).
+                               Navigator.push(context, MaterialPageRoute(builder: (_) => const GameSettingsScreen()));
                             },
                           ),
                         ],
                       ),
                     ),
 
-                    // --- Custom Level Layout (2-2-1) ---
+                    // --- Level Grid ---
                     Expanded(
                       child: Center(
                         child: SingleChildScrollView(
@@ -224,27 +200,17 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
                             children: [
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  _buildLevelButton(levels[0]),
-                                  const SizedBox(width: 40), 
-                                  _buildLevelButton(levels[1]),
-                                ],
+                                children: [_buildLevelButton(levels[0]), const SizedBox(width: 40), _buildLevelButton(levels[1])],
                               ),
                               const SizedBox(height: 30), 
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  _buildLevelButton(levels[2]),
-                                  const SizedBox(width: 40), 
-                                  _buildLevelButton(levels[3]),
-                                ],
+                                children: [_buildLevelButton(levels[2]), const SizedBox(width: 40), _buildLevelButton(levels[3])],
                               ),
                               const SizedBox(height: 30), 
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  _buildLevelButton(levels[4]),
-                                ],
+                                children: [_buildLevelButton(levels[4])],
                               ),
                             ],
                           ),
@@ -252,26 +218,20 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
                       ),
                     ),
 
-                    // --- Navigation Arrows ---
+                    // --- Arrows ---
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 30.0, vertical: 20.0),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          _buildNavArrow(
-                            Icons.arrow_back, 
-                            _difficulty == 'easy' ? null : () {
+                          _buildNavArrow(Icons.arrow_back, _difficulty == 'easy' ? null : () {
                               if (_difficulty == 'medium') _updateDifficulty('easy');
                               else if (_difficulty == 'hard') _updateDifficulty('medium');
-                            }
-                          ),
-                          _buildNavArrow(
-                            Icons.arrow_forward, 
-                            _difficulty == 'hard' ? null : () {
+                          }),
+                          _buildNavArrow(Icons.arrow_forward, _difficulty == 'hard' ? null : () {
                               if (_difficulty == 'easy') _updateDifficulty('medium');
                               else if (_difficulty == 'medium') _updateDifficulty('hard');
-                            }
-                          ),
+                          }),
                         ],
                       ),
                     ),
@@ -286,34 +246,23 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
     bool isLocked = level > _unlockedLevel;
     int starCount = _levelStars[level] ?? 0;
     
-    // Logic: Only show stars if unlocked AND we have stars recorded
+    // Check if we have stars to show
     bool hasStars = !isLocked && starCount > 0;
     
     return GestureDetector(
       onTap: () {
         if (isLocked) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text("Level is locked"),
-            duration: Duration(seconds: 1),
-            backgroundColor: Colors.redAccent,
-          ));
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Level is locked"), duration: Duration(seconds: 1), backgroundColor: Colors.redAccent));
         } else {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => PlayGameScreen(level: level)),
-          );
+          Navigator.push(context, MaterialPageRoute(builder: (_) => PlayGameScreen(level: level)));
         }
       },
       child: Container(
-        width: 100, 
-        height: 100, 
+        width: 100, height: 100, 
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: isLocked 
-                ? [Colors.grey.shade400, Colors.grey.shade600] 
-                : [const Color(0xFF4A90E2), const Color(0xFF357ABD)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+            colors: isLocked ? [Colors.grey.shade400, Colors.grey.shade600] : [const Color(0xFF4A90E2), const Color(0xFF357ABD)],
+            begin: Alignment.topLeft, end: Alignment.bottomRight,
           ),
           borderRadius: BorderRadius.circular(20), 
           border: Border.all(color: const Color(0xFF2E6DA4), width: 4),
@@ -322,7 +271,7 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
         child: Stack(
           alignment: Alignment.center,
           children: [
-            // Stars at the top
+            // Stars
             if (hasStars)
               Positioned(
                 top: 5,
@@ -337,22 +286,12 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
                   }),
                 ),
               ),
-              
-            // Center Content
+            // Number / Lock
             isLocked
                 ? const Icon(Icons.lock, color: Colors.white70, size: 40)
                 : Padding(
-                    // If stars exist, push text down. If not, 0 padding (center).
                     padding: EdgeInsets.only(top: hasStars ? 22.0 : 0.0), 
-                    child: Text(
-                        "$level",
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 40,
-                          fontWeight: FontWeight.bold,
-                          shadows: [Shadow(color: Colors.black38, offset: Offset(2, 2), blurRadius: 4)]
-                        ),
-                      ),
+                    child: Text("$level", style: const TextStyle(color: Colors.white, fontSize: 40, fontWeight: FontWeight.bold)),
                   ),
           ],
         ),
@@ -361,13 +300,12 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
   }
 
   Widget _buildNavArrow(IconData icon, VoidCallback? onTap) {
-    bool isDisabled = onTap == null;
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: isDisabled ? Colors.grey : Colors.red,
+          color: onTap == null ? Colors.grey : Colors.red,
           shape: BoxShape.circle,
           boxShadow: const [BoxShadow(color: Colors.black26, offset: Offset(2, 4), blurRadius: 4)],
         ),

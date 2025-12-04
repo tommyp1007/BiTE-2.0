@@ -22,12 +22,14 @@
     <string>????</string>
     <key>CFBundleVersion</key>
     <string>$(FLUTTER_BUILD_NUMBER)</string>
+    
     <key>LSRequiresIPhoneOS</key>
     <true/>
     <key>UILaunchStoryboardName</key>
     <string>LaunchScreen</string>
     <key>UIMainStoryboardFile</key>
     <string>Main</string>
+    
     <key>UISupportedInterfaceOrientations</key>
     <array>
         <string>UIInterfaceOrientationPortrait</string>
@@ -41,19 +43,20 @@
         <string>UIInterfaceOrientationLandscapeLeft</string>
         <string>UIInterfaceOrientationLandscapeRight</string>
     </array>
+    
     <key>CADisableMinimumFrameDurationOnPhone</key>
     <true/>
     <key>UIApplicationSupportsIndirectInputEvents</key>
     <true/>
     
     <key>NSPhotoLibraryUsageDescription</key>
-    <string>This app requires access to the photo library to upload profile pictures.</string>
+    <string>BiTE needs access to your photo library to let you upload a profile picture.</string>
     <key>NSCameraUsageDescription</key>
-    <string>This app requires access to the camera to take profile pictures.</string>
+    <string>BiTE needs access to your camera to let you take a profile picture.</string>
     <key>NSLocationWhenInUseUsageDescription</key>
-    <string>This app requires access to location when open.</string>
+    <string>BiTE requires access to your location to provide regional content.</string>
     <key>NSMicrophoneUsageDescription</key>
-    <string>This app requires access to the microphone for audio features.</string>
+    <string>BiTE needs microphone access for voice features.</string>
     
     <key>UIStatusBarHidden</key>
     <false/>
