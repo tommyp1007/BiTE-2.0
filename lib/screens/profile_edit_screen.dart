@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../theme/app_colors.dart';
@@ -11,7 +12,6 @@ class ProfileEditScreen extends StatefulWidget {
 }
 
 class _ProfileEditScreenState extends State<ProfileEditScreen> {
-  // Controllers
   final _firstNameCtrl = TextEditingController();
   final _lastNameCtrl = TextEditingController();
   final _usernameCtrl = TextEditingController();
@@ -26,6 +26,11 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   final FirebaseFirestore db = FirebaseFirestore.instance;
   bool _isLoading = false;
 
+  // Visibility States
+  bool _isCurrentVisible = false;
+  bool _isNewVisible = false;
+  bool _isConfirmVisible = false;
+
   @override
   void initState() {
     super.initState();
@@ -34,7 +39,6 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     }
   }
 
-  // Load data from Firestore (Matches Java: loadUserProfile)
   Future<void> _loadUserProfile() async {
     _emailCtrl.text = user!.email ?? '';
     try {
@@ -54,8 +58,9 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     }
   }
 
-  // Matches Java: saveProfileChanges logic flow
   Future<void> _saveProfileChanges() async {
+    FocusScope.of(context).unfocus(); // Close keyboard
+
     String firstName = _firstNameCtrl.text.trim();
     String lastName = _lastNameCtrl.text.trim();
     String username = _usernameCtrl.text.trim();
@@ -65,7 +70,6 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     String newPassword = _newPasswordCtrl.text.trim();
     String confirmPassword = _confirmPasswordCtrl.text.trim();
 
-    // 1. Validation
     if (firstName.isEmpty || lastName.isEmpty || username.isEmpty || email.isEmpty || phone.isEmpty) {
       _showToast("All fields are required.");
       return;
@@ -84,7 +88,6 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // 2. Check if current password is provided (Logic from Java)
       if (currentPassword.isNotEmpty) {
         // Re-authenticate user
         AuthCredential credential = EmailAuthProvider.credential(email: user!.email!, password: currentPassword);
@@ -92,21 +95,22 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         try {
           await user!.reauthenticateWithCredential(credential);
 
-          // If re-auth success, check if we need to update password
           if (newPassword.isNotEmpty) {
             await user!.updatePassword(newPassword);
-            // Password updated, now update profile details
+            
+            // --- AUTOFILL TRIGGER ---
+            // Password Updated - Update Saved Credentials
+            TextInput.finishAutofillContext();
+            
             await _updateUserProfile(firstName, lastName, username, email, phone);
           } else {
-            // No new password, just update profile details
             await _updateUserProfile(firstName, lastName, username, email, phone);
           }
         } on FirebaseAuthException catch (e) {
           setState(() => _isLoading = false);
-          _showToast("Current password is incorrect."); // Matches Java error handling
+          _showToast("Current password is incorrect."); 
         }
       } else {
-        // No current password entered, just update profile directly
         await _updateUserProfile(firstName, lastName, username, email, phone);
       }
     } catch (e) {
@@ -115,26 +119,20 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     }
   }
 
-  // Matches Java: updateUserProfile
   Future<void> _updateUserProfile(String first, String last, String userN, String email, String phone) async {
-    // Check if email needs update
     if (email != user!.email) {
       try {
-        // Note: Flutter recommends verifyBeforeUpdateEmail, but logic follows Java's updateEmail flow
         await user!.verifyBeforeUpdateEmail(email); 
-        // After email update init, update Firestore
         await _updateFirestoreProfile(first, last, userN, email, phone);
       } catch (e) {
         setState(() => _isLoading = false);
         _showToast("Failed to update email: $e");
       }
     } else {
-      // Email unchanged
       await _updateFirestoreProfile(first, last, userN, email, phone);
     }
   }
 
-  // Matches Java: updateFirestoreProfile
   Future<void> _updateFirestoreProfile(String first, String last, String userN, String email, String phone) async {
     try {
       await db.collection('users').doc(user!.uid).update({
@@ -147,8 +145,6 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
 
       setState(() => _isLoading = false);
       _showToast("Profile updated successfully!");
-
-      // Navigate to Home (Matches Java: startActivity MainActivity)
       _navigateToHome();
 
     } catch (e) {
@@ -169,15 +165,13 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
-  // Handle Back Button (Matches Java: onBackPressed)
   Future<bool> _onWillPop() async {
     _navigateToHome();
-    return false; // Prevent default pop, since we handled navigation manually
+    return false; 
   }
 
   @override
   Widget build(BuildContext context) {
-    // PopScope (or WillPopScope) handles the physical back button logic from Android
     return PopScope(
       canPop: false,
       onPopInvoked: (didPop) {
@@ -189,11 +183,10 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         body: SafeArea(
           child: Column(
             children: [
-              // Header
               Align(
                 alignment: Alignment.topLeft,
                 child: GestureDetector(
-                  onTap: _navigateToHome, // Back arrow now goes to Home, matching Java finish/intent logic
+                  onTap: _navigateToHome, 
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: Image.asset('assets/images/back_icon.png', width: 40, height: 40),
@@ -204,56 +197,92 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
               Expanded(
                 child: SingleChildScrollView(
                   padding: EdgeInsets.symmetric(horizontal: 20),
-                  child: Column(
-                    children: [
-                      Image.asset('assets/images/edit_user.png', width: 70, height: 70),
-                      SizedBox(height: 10),
-                      Text("Edit Profile", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
-                      SizedBox(height: 20),
+                  child: AutofillGroup(
+                    child: Column(
+                      children: [
+                        Image.asset('assets/images/edit_user.png', width: 70, height: 70),
+                        SizedBox(height: 10),
+                        Text("Edit Profile", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
+                        SizedBox(height: 20),
 
-                      _buildField("First Name", _firstNameCtrl),
-                      _buildField("Last Name", _lastNameCtrl),
-                      _buildField("Username", _usernameCtrl),
-                      _buildField("Email", _emailCtrl, isEmail: true),
-                      _buildField("Phone Number", _phoneCtrl, isPhone: true),
-                      _buildField("Current Password", _currentPasswordCtrl, obscure: true),
-                      _buildField("New Password", _newPasswordCtrl, obscure: true),
-                      _buildField("Confirm Password", _confirmPasswordCtrl, obscure: true),
+                        _buildField("First Name", _firstNameCtrl, autofillHints: [AutofillHints.givenName]),
+                        _buildField("Last Name", _lastNameCtrl, autofillHints: [AutofillHints.familyName]),
+                        _buildField("Username", _usernameCtrl, autofillHints: [AutofillHints.username]),
+                        _buildField("Email", _emailCtrl, isEmail: true, autofillHints: [AutofillHints.email]),
+                        _buildField("Phone Number", _phoneCtrl, isPhone: true, autofillHints: [AutofillHints.telephoneNumber]),
+                        
+                        Divider(color: Colors.white54),
+                        SizedBox(height: 10),
+                        Text("Change Password (Optional)", style: TextStyle(color: Colors.white70)),
+                        SizedBox(height: 10),
 
-                      SizedBox(height: 20),
-                      _isLoading
-                          ? CircularProgressIndicator(color: Colors.white)
-                          : ElevatedButton(
-                              onPressed: _saveProfileChanges,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.secondary,
-                                minimumSize: Size(double.infinity, 50),
-                              ),
-                              child: Text("Update Profile", style: TextStyle(color: Colors.white)),
-                            ),
-
-                      SizedBox(height: 10),
-                      ElevatedButton(
-                        onPressed: () async {
-                          await FirebaseAuth.instance.signOut();
-                          Navigator.pushAndRemoveUntil(
-                            context,
-                            MaterialPageRoute(builder: (_) => SignInScreen()),
-                            (route) => false,
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.secondary,
-                          minimumSize: Size(double.infinity, 50),
+                        _buildField(
+                          "Current Password", 
+                          _currentPasswordCtrl, 
+                          isPassword: true,
+                          isVisible: _isCurrentVisible,
+                          onVisibilityToggle: () {
+                             setState(() => _isCurrentVisible = !_isCurrentVisible);
+                          },
+                          autofillHints: [AutofillHints.password]
                         ),
-                        child: Text("Logout", style: TextStyle(color: Colors.white)),
-                      ),
-                      SizedBox(height: 20),
-                    ],
+                        
+                        _buildField(
+                          "New Password", 
+                          _newPasswordCtrl, 
+                          isPassword: true,
+                          isVisible: _isNewVisible,
+                          onVisibilityToggle: () {
+                             setState(() => _isNewVisible = !_isNewVisible);
+                          },
+                          autofillHints: [AutofillHints.newPassword]
+                        ),
+                        
+                        _buildField(
+                          "Confirm Password", 
+                          _confirmPasswordCtrl, 
+                          isPassword: true,
+                          isVisible: _isConfirmVisible,
+                          onVisibilityToggle: () {
+                             setState(() => _isConfirmVisible = !_isConfirmVisible);
+                          },
+                          autofillHints: [AutofillHints.newPassword]
+                        ),
+
+                        SizedBox(height: 20),
+                        _isLoading
+                            ? CircularProgressIndicator(color: Colors.white)
+                            : ElevatedButton(
+                                onPressed: _saveProfileChanges,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.secondary,
+                                  minimumSize: Size(double.infinity, 50),
+                                ),
+                                child: Text("Update Profile", style: TextStyle(color: Colors.white)),
+                              ),
+
+                        SizedBox(height: 10),
+                        ElevatedButton(
+                          onPressed: () async {
+                            await FirebaseAuth.instance.signOut();
+                            Navigator.pushAndRemoveUntil(
+                              context,
+                              MaterialPageRoute(builder: (_) => SignInScreen()),
+                              (route) => false,
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.secondary,
+                            minimumSize: Size(double.infinity, 50),
+                          ),
+                          child: Text("Logout", style: TextStyle(color: Colors.white)),
+                        ),
+                        SizedBox(height: 20),
+                      ],
+                    ),
                   ),
                 ),
               ),
-              // Bottom Panel placeholder
               Container(height: 50, color: AppColors.primaryDark),
             ],
           ),
@@ -262,12 +291,23 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     );
   }
 
-  Widget _buildField(String hint, TextEditingController ctrl, {bool obscure = false, bool isEmail = false, bool isPhone = false}) {
+  Widget _buildField(
+    String hint, 
+    TextEditingController ctrl, 
+    {
+      bool isPassword = false, 
+      bool isVisible = false,
+      VoidCallback? onVisibilityToggle,
+      bool isEmail = false, 
+      bool isPhone = false, 
+      Iterable<String>? autofillHints
+    }) {
     return Padding(
       padding: const EdgeInsets.only(top: 10.0),
       child: TextField(
         controller: ctrl,
-        obscureText: obscure,
+        obscureText: isPassword ? !isVisible : false,
+        autofillHints: autofillHints,
         keyboardType: isEmail ? TextInputType.emailAddress : (isPhone ? TextInputType.phone : TextInputType.text),
         style: TextStyle(color: Colors.black),
         decoration: InputDecoration(
@@ -276,6 +316,15 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
           fillColor: Colors.white,
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(5)),
           hintStyle: TextStyle(color: Colors.grey),
+          suffixIcon: isPassword 
+            ? IconButton(
+                icon: Icon(
+                  isVisible ? Icons.visibility : Icons.visibility_off,
+                  color: Colors.grey,
+                ),
+                onPressed: onVisibilityToggle,
+              )
+            : null,
         ),
       ),
     );

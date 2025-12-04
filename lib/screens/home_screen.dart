@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/services.dart';
-// 1. IMPORT PERMISSION HANDLER
+// import 'package:flutter/services.dart'; // Not strictly needed here anymore as BottomNav handles exit
 import 'package:permission_handler/permission_handler.dart'; 
 
 import '../../theme/app_colors.dart';
 import '../../services/shared_preferences_helper.dart';
-import '../widgets/common_layouts.dart'; // BottomNavPanel
+import '../widgets/common_layouts.dart'; // Ensure this points to the file above
 import 'auth/sign_in_screen.dart';
 import 'profile_edit_screen.dart';
 import 'translator/text_translator_screen.dart';
@@ -41,24 +40,18 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _checkUserStatus();
-    // 2. CALL PERMISSION REQUEST ON STARTUP
     _requestInitialPermissions();
   }
 
-  // 3. LOGIC TO REQUEST PERMISSIONS
   Future<void> _requestInitialPermissions() async {
-    // You can customize this list based on what your app specifically needs
-    // For a Translator/Dictionary app, Mic and Notification are common.
     Map<Permission, PermissionStatus> statuses = await [
       Permission.microphone, 
       Permission.storage, 
       Permission.notification,
     ].request();
 
-    // Optional: Logic if permissions are permanently denied
     if (statuses[Permission.microphone]!.isPermanentlyDenied) {
-      // You could show a dialog here asking them to open settings manually
-      // openAppSettings(); 
+      // Handle denied permissions
     }
   }
 
@@ -76,7 +69,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // Java: loadGameStateFromFirestore
   void _loadGameStateFromFirestore(String userId) async {
     try {
       DocumentSnapshot doc = await _db.collection('users').doc(userId).get();
@@ -94,7 +86,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // Java: fetchFirstNameFromFirestore
   void _fetchFirstNameFromFirestore(String userId) async {
     try {
       DocumentSnapshot doc = await _db.collection('users').doc(userId).get();
@@ -115,7 +106,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _handleGridClick(String title, Widget page) {
     if (isInGuestMode) {
-      // Adjust guest mode behavior for specific activities
       if (title == "Word Guess" || title == "Vocabulary Learning") {
         _promptSignIn();
       } else {
@@ -136,7 +126,6 @@ class _HomeScreenState extends State<HomeScreen> {
       Navigator.push(context, MaterialPageRoute(builder: (_) => SignInScreen()));
     } else {
       await _auth.signOut();
-      // Refresh Activity logic equivalent
       Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => HomeScreen()));
     }
   }
@@ -145,10 +134,13 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.primary,
+      // IMPORTANT: BottomNavPanel is moved here to ensure it stays at the bottom
+      bottomNavigationBar: BottomNavPanel(), 
       body: SafeArea(
+        bottom: false, // We let the bottomNavigationBar handle the bottom safe area
         child: Column(
           children: [
-            // 1. App Header (Custom implementation for Main Activity)
+            // 1. App Header
             Container(
               padding: EdgeInsets.all(10),
               child: Row(
@@ -199,7 +191,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   crossAxisCount: 2,
                   crossAxisSpacing: 16,
                   mainAxisSpacing: 16,
-                  childAspectRatio: 1.0, // Square items
+                  childAspectRatio: 1.0, 
                 ),
                 itemCount: _gridItems.length,
                 itemBuilder: (context, index) {
@@ -234,12 +226,11 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
 
-            // 5. Trademark
-            Text("Developed by: TOMMY ANAK PEYEI", style: TextStyle(color: Colors.white, fontSize: 12)),
-            SizedBox(height: 8),
-
-            // 6. Bottom Panel
-            BottomNavPanel(),
+            // 5. Trademark (This sits right above the bottom nav bar now)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8.0),
+              child: Text("Developed by: TOMMY ANAK PEYEI", style: TextStyle(color: Colors.white, fontSize: 12)),
+            ),
           ],
         ),
       ),

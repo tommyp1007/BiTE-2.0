@@ -5,7 +5,7 @@
     <key>CFBundleDevelopmentRegion</key>
     <string>$(DEVELOPMENT_LANGUAGE)</string>
     <key>CFBundleDisplayName</key>
-    <string>Bite Flutter</string>
+    <string>BiTE</string>
     <key>CFBundleExecutable</key>
     <string>$(EXECUTABLE_NAME)</string>
     <key>CFBundleIdentifier</key>
@@ -13,7 +13,7 @@
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-    <string>bite_flutter</string>
+    <string>BiTE</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
@@ -45,6 +45,7 @@
     <true/>
     <key>UIApplicationSupportsIndirectInputEvents</key>
     <true/>
+    
     <key>NSPhotoLibraryUsageDescription</key>
     <string>This app requires access to the photo library to upload profile pictures.</string>
     <key>NSCameraUsageDescription</key>
@@ -53,6 +54,7 @@
     <string>This app requires access to location when open.</string>
     <key>NSMicrophoneUsageDescription</key>
     <string>This app requires access to the microphone for audio features.</string>
+    
     <key>UIStatusBarHidden</key>
     <false/>
 </dict>

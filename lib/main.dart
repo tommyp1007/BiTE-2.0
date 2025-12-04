@@ -1,19 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter_native_splash/flutter_native_splash.dart'; // 1. Import
+import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'firebase_options.dart'; 
 import 'theme/app_colors.dart';
-import 'screens/splash_screen.dart'; // Import the new splash screen
+import 'screens/splash_screen.dart'; 
 
 void main() async {
   // 1. Initialize Bindings
   WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
 
-  // 2. Preserve the Native Splash (Solid Green Screen)
-  // This prevents the white/black flash before Flutter loads
+  // 2. Preserve Native Splash
   FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
 
   // 3. Initialize Firebase
+  // Ensure firebase_options.dart is generated via FlutterFire CLI
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
@@ -39,6 +39,7 @@ class MyApp extends StatelessWidget {
           seedColor: AppColors.primary,
           primary: AppColors.primary,
           secondary: AppColors.secondary,
+          // Important: Define text styles globally to ensure consistency
         ),
         useMaterial3: true,
         textTheme: const TextTheme(

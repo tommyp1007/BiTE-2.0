@@ -49,6 +49,7 @@ dev_dependencies:
   # Lints for good coding practices
   flutter_lints: ^6.0.0
   flutter_native_splash: ^2.3.0  # <--- Add this line
+  flutter_launcher_icons: "^0.13.1"
 
 flutter:
   uses-material-design: true
@@ -77,3 +78,10 @@ flutter_native_splash:
     color: "#2E7D32"
     # image: assets/images/bite_icon.png # Commented out
   web: false
+
+# Add this configuration block at the very end of the file
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/images/bite_icon.png" # Your specific image
+  min_sdk_android: 21 # essential for newer flutter versions
