@@ -34,8 +34,8 @@ workflows:
           cd build/ios/iphoneos
           mkdir Payload
           mv Runner.app Payload/
-          zip -r ios_unsigned.ipa Payload
-          mv ios_unsigned.ipa $CM_EXPORT_DIR/ios_unsigned.ipa
+          zip -r BiTE.ipa Payload
+          mv BiTE.ipa $CM_EXPORT_DIR/BiTE.ipa
 
     artifacts:
       - $CM_EXPORT_DIR/*.ipa
