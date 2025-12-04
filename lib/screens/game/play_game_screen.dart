@@ -40,7 +40,7 @@ class _PlayGameScreenState extends State<PlayGameScreen> with WidgetsBindingObse
   bool _showHint = false;
   String _hintText = "";
   
-  // --- Hint Tracking ---
+  // --- Hint Tracking (Kept from new code for Star Calculation) ---
   int _hintsUsed = 0; 
 
   // --- Settings State ---
@@ -62,52 +62,10 @@ class _PlayGameScreenState extends State<PlayGameScreen> with WidgetsBindingObse
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     
-    // Initialize level immediately to prevent UI null errors
+    // --- SIMPLIFIED INIT (From Previous Code) ---
     _currentLevel = widget.level;
     _initializeLevel();
-
-    // Call the async setup to ensure Audio Context is set BEFORE music starts
-    _initGameSetup();
-  }
-
-  /// New method to ensure initialization order
-  Future<void> _initGameSetup() async {
-    // 1. Configure Audio Context (Allow Mixing) FIRST
-    await _configureAudioContext();
-
-    // 2. Setup listener for BGM looping
-    _bgmPlayer.onPlayerComplete.listen((event) {
-      if (!_isGameFinished && _bgmPlayer.state != PlayerState.playing) {
-        _bgmPlayer.resume();
-      }
-    });
-
-    // 3. Start Music only after Context is confirmed
-    if (mounted) {
-      await _updateSettingsAndAudio(startMusic: true);
-    }
-  }
-
-  /// Configures the audio session so SFX doesn't kill BGM
-  Future<void> _configureAudioContext() async {
-    final AudioContext audioContext = AudioContext(
-      iOS: AudioContextIOS(
-        category: AVAudioSessionCategory.ambient, // Ambient allows mixing
-        options: {
-          AVAudioSessionOptions.mixWithOthers, // Key for iOS
-        },
-      ),
-      android: AudioContextAndroid(
-        isSpeakerphoneOn: true,
-        stayAwake: true,
-        contentType: AndroidContentType.music,
-        usageType: AndroidUsageType.game,
-        audioFocus: AndroidAudioFocus.none, // Key for Android: Do not demand exclusive focus
-      ),
-    );
-    
-    // Apply globally
-    await AudioPlayer.global.setAudioContext(audioContext);
+    _updateSettingsAndAudio(startMusic: true);
   }
 
   @override
@@ -136,7 +94,8 @@ class _PlayGameScreenState extends State<PlayGameScreen> with WidgetsBindingObse
     _prefs.setCurrentLevel(_currentLevel);
   }
 
-  // --- Settings & Audio Methods ---
+  // --- Settings & Audio Methods (From Previous Code) ---
+  
   Future<void> _updateSettingsAndAudio({bool startMusic = false}) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.reload(); 
@@ -155,7 +114,6 @@ class _PlayGameScreenState extends State<PlayGameScreen> with WidgetsBindingObse
     if (startMusic) {
       _playRandomBackgroundMusic();
     } else {
-      // If we are coming back from settings, ensure playing
       if (_bgmPlayer.state != PlayerState.playing && (!_isGameFinished || !_isSuccess)) {
          _bgmPlayer.resume();
       }
@@ -163,7 +121,6 @@ class _PlayGameScreenState extends State<PlayGameScreen> with WidgetsBindingObse
   }
 
   void _playRandomBackgroundMusic() async {
-    // If already playing, just update volume
     if (_bgmPlayer.state == PlayerState.playing) {
       await _bgmPlayer.setVolume(_bgmVolume);
       return;
@@ -172,20 +129,18 @@ class _PlayGameScreenState extends State<PlayGameScreen> with WidgetsBindingObse
     int index = Random().nextInt(10) + 1; 
     String musicFile = 'audio/pou$index.mp3';
     
-    // Explicitly set ReleaseMode to loop
+    // Reverted to simple ReleaseMode loop
     await _bgmPlayer.setReleaseMode(ReleaseMode.loop);
     await _bgmPlayer.setVolume(_bgmVolume); 
     await _bgmPlayer.play(AssetSource(musicFile));
   }
 
-  void _playSound(String name) async {
-    // Ensure SFX volume is set
-    await _sfxPlayer.setVolume(_sfxVolume);
-    
-    // Stop previous SFX to ensure instant response, then play new one
-    // Note: Because we set AndroidAudioFocus.none, this stop() won't affect BGM
-    await _sfxPlayer.stop();
-    await _sfxPlayer.play(AssetSource('audio/$name.mp3'));
+  void _playSound(String name) {
+    // Reverted to simple Stop -> Play logic
+    _sfxPlayer.setVolume(_sfxVolume);
+    _sfxPlayer.stop().then((_) {
+      _sfxPlayer.play(AssetSource('audio/$name.mp3'));
+    });
   }
 
   void _triggerVibration() {
