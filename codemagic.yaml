@@ -1,6 +1,6 @@
 workflows:
-  ios-unsigned-build:
-    name: iOS Unsigned IPA
+  ios-unsigned-ipa:
+    name: iOS Unsigned IPA Build
     instance_type: mac_mini_m2
     max_build_duration: 60
     environment:
@@ -11,25 +11,22 @@ workflows:
       - name: Get Flutter packages
         script: |
           flutter pub get
-      
+
       - name: Install Pods
         script: |
           find . -name "Podfile" -execdir pod install \;
-      
-      - name: Build iOS .app (No Code Signing)
+
+      - name: Build iOS .app bundle (No Code Signing)
         script: |
-          # 1. Build the raw .app bundle without signing
-          flutter build ios --release --no-codesign
+          # Build unsigned iOS app for generic device (iPhone & iPad)
+          flutter build ios --no-codesign
           
-          # 2. Convert the .app to an .ipa manually
-          # (Flutter build ipa requires signing, so we do this manually)
+      - name: Create IPA from .app
+        script: |
           cd build/ios/iphoneos
           mkdir Payload
           mv Runner.app Payload/
-          zip -r -y payload.ipa Payload/
-          
-          # 3. Move the IPA to the export directory
-          mv payload.ipa $CM_EXPORT_DIR/bite_flutter_unsigned.ipa
+          zip -r bite_app_unsigned.ipa Payload
           
     artifacts:
-      - bite_flutter_unsigned.ipa
+      - build/ios/iphoneos/bite_app_unsigned.ipa
