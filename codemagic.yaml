@@ -5,43 +5,52 @@ workflows:
     max_build_duration: 60
     environment:
       flutter: stable
-      xcode: latest
+      xcode: latest # Uses the latest Xcode to ensure iOS 15+ SDK support
       cocoapods: default
     scripts:
-      - name: Get Flutter packages
+      - name: Clean up and Setup
         script: |
-          flutter packages pub get
+          # 1. Clean build cache
+          flutter clean
+          
+          # 2. IMPORTANT: Remove the local Podfile.lock. 
+          # This forces CocoaPods to resolve dependencies again using your new 'platform :ios, 15.0' setting.
+          rm -f ios/Podfile.lock
+          
+          # 3. Get packages
+          flutter pub get
 
       - name: Install Pods
         script: |
-          find . -name "Podfile" -execdir pod install \;
+          # Install pods and update the repo to get the latest Firebase versions
+          find . -name "Podfile" -execdir pod install --repo-update \;
 
       - name: Build iOS without signing
         script: |
-          # Build the .app bundle in release mode without code signing
+          # Build the .app bundle in release mode without code signing capabilities
           flutter build ios --release --no-codesign
 
       - name: Package .app into unsigned .ipa
         script: |
-          # Navigate to the build output directory
+          # Go to the build output directory
           cd build/ios/iphoneos
           
-          # Create the required Payload directory structure for an IPA
+          # 1. Create a directory named 'Payload' (Required for IPA structure)
           mkdir Payload
           
-          # Move the Runner.app into the Payload directory
+          # 2. Move the built App into the Payload folder
           mv Runner.app Payload/
           
-          # Zip the Payload directory into a .ipa file
+          # 3. Zip the Payload folder into a file named 'ios_unsigned.ipa'
           zip -r ios_unsigned.ipa Payload
           
-          # Move the ipa back to the root or a known path for artifacts
+          # 4. Move the resulting IPA to the export directory so you can download it
           mv ios_unsigned.ipa $CM_EXPORT_DIR/ios_unsigned.ipa
 
     artifacts:
-      - $CM_EXPORT_DIR/*.ipa  # Save the generated IPA so you can download it
+      - $CM_EXPORT_DIR/*.ipa
     
     publishing:
       email:
         recipients:
-          - tommypeyei@gmail.com # You will receive the download link here
+          - tommypeyei@gmail.com # Change this to your email address!
