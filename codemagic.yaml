@@ -1,5 +1,5 @@
 workflows:
-  ios-unsigned-ipa:
+  ios-unsigned-build:
     name: iOS Unsigned IPA Build
     instance_type: mac_mini_m2
     max_build_duration: 60
@@ -10,30 +10,38 @@ workflows:
     scripts:
       - name: Get Flutter packages
         script: |
-          flutter pub get
+          flutter packages pub get
 
       - name: Install Pods
         script: |
           find . -name "Podfile" -execdir pod install \;
 
-      - name: Build and Package IPA
+      - name: Build iOS without signing
         script: |
-          # 1. Build the .app bundle (unsigned)
+          # Build the .app bundle in release mode without code signing
           flutter build ios --release --no-codesign
 
-          # 2. Navigate to the build directory
+      - name: Package .app into unsigned .ipa
+        script: |
+          # Navigate to the build output directory
           cd build/ios/iphoneos
-
-          # 3. Create the Payload folder structure required by Apple
+          
+          # Create the required Payload directory structure for an IPA
           mkdir Payload
+          
+          # Move the Runner.app into the Payload directory
           mv Runner.app Payload/
-
-          # 4. Zip the Payload folder into a .ipa file
-          # The -y flag preserves symbolic links (crucial for iOS apps)
-          zip -r -y bite_flutter.ipa Payload/
-
-          # 5. Move the finished .ipa to the export directory
-          mv bite_flutter.ipa $CM_EXPORT_DIR/bite_flutter.ipa
+          
+          # Zip the Payload directory into a .ipa file
+          zip -r ios_unsigned.ipa Payload
+          
+          # Move the ipa back to the root or a known path for artifacts
+          mv ios_unsigned.ipa $CM_EXPORT_DIR/ios_unsigned.ipa
 
     artifacts:
-      - bite_flutter.ipa # This ensures you download the .ipa file directly
+      - $CM_EXPORT_DIR/*.ipa  # Save the generated IPA so you can download it
+    
+    publishing:
+      email:
+        recipients:
+          - tommypeyei@gmail.com # You will receive the download link here
