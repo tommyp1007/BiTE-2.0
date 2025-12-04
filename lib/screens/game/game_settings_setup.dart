@@ -5,7 +5,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../theme/app_colors.dart';
-import '../../services/shared_preferences_helper.dart'; // Import Helper
+import '../../services/shared_preferences_helper.dart'; 
 
 class GameSettingsScreen extends StatefulWidget {
   final Function(double)? onBgmVolumeChanged;
@@ -25,12 +25,12 @@ class GameSettingsScreen extends StatefulWidget {
 
 class _GameSettingsScreenState extends State<GameSettingsScreen> {
   final AudioPlayer _testSfxPlayer = AudioPlayer();
-  final SharedPreferencesHelper _prefsHelper = SharedPreferencesHelper(); // Helper instance
+  final SharedPreferencesHelper _prefsHelper = SharedPreferencesHelper(); 
 
   double _bgmVolume = 0.5;
   double _sfxVolume = 1.0;
   bool _vibrationEnabled = true;
-  bool _isResetting = false; // To show loading during reset
+  bool _isResetting = false; 
 
   @override
   void initState() {
@@ -79,15 +79,14 @@ class _GameSettingsScreenState extends State<GameSettingsScreen> {
     if (value) HapticFeedback.mediumImpact();
   }
 
-  // --- RESET LOGIC START ---
+  // --- UPDATED RESET LOGIC ---
   Future<void> _handleResetProgress() async {
-    // 1. Show Confirmation Dialog
     bool? confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: Colors.white,
         title: const Text("Reset Progress?", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
-        content: const Text("This will lock all levels except Level 1. This action cannot be undone."),
+        content: const Text("This will lock all levels and clear all stars. This action cannot be undone."),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
@@ -107,17 +106,16 @@ class _GameSettingsScreenState extends State<GameSettingsScreen> {
     setState(() => _isResetting = true);
 
     try {
-      // 2. Reset Local SharedPreferences
-      await _prefsHelper.setUnlockedLevel(1);
-      await _prefsHelper.setCurrentLevel(1);
+      // 1. Reset Local Data (Using the new specific method)
+      await _prefsHelper.resetGameProgressOnly();
 
-      // 3. Reset Firebase Firestore
+      // 2. Reset Firebase Firestore
       User? user = FirebaseAuth.instance.currentUser;
       if (user != null) {
         await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
           'unlockedLevel': 1,
           'currentLevel': 1,
-          // You can also reset score if you want: 'score': 0,
+          'levelStars': {}, // Clears the stars map in DB
         });
       }
 
@@ -136,7 +134,6 @@ class _GameSettingsScreenState extends State<GameSettingsScreen> {
       if (mounted) setState(() => _isResetting = false);
     }
   }
-  // --- RESET LOGIC END ---
 
   @override
   Widget build(BuildContext context) {
@@ -145,7 +142,6 @@ class _GameSettingsScreenState extends State<GameSettingsScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // --- Header ---
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Row(
@@ -201,9 +197,9 @@ class _GameSettingsScreenState extends State<GameSettingsScreen> {
                           Text("${(_bgmVolume * 100).toInt()}%", style: const TextStyle(color: Colors.white)),
                         ],
                       ),
-                  
+                      
                       const SizedBox(height: 30),
-                  
+                      
                       _buildSectionTitle("Sound Effects"),
                       Row(
                         children: [
@@ -221,9 +217,9 @@ class _GameSettingsScreenState extends State<GameSettingsScreen> {
                           Text("${(_sfxVolume * 100).toInt()}%", style: const TextStyle(color: Colors.white)),
                         ],
                       ),
-                  
+                      
                       const SizedBox(height: 30),
-                  
+                      
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -240,7 +236,6 @@ class _GameSettingsScreenState extends State<GameSettingsScreen> {
                       const Divider(color: Colors.white30),
                       const SizedBox(height: 20),
 
-                      // --- RESET BUTTON UI ---
                       _isResetting 
                         ? const CircularProgressIndicator(color: Colors.redAccent)
                         : SizedBox(

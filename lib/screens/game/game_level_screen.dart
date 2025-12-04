@@ -7,7 +7,7 @@ import '../../services/shared_preferences_helper.dart';
 import 'play_game_screen.dart';
 import 'game_settings_setup.dart'; 
 import 'word_guess_entry_screen.dart'; 
-import '../../widgets/common_layouts.dart'; 
+// import '../../widgets/common_layouts.dart'; // Ensure this exists or remove if not needed
 
 class GameLevelScreen extends StatefulWidget {
   const GameLevelScreen({Key? key}) : super(key: key);
@@ -21,14 +21,12 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  // Real-time listener
   StreamSubscription<DocumentSnapshot>? _userStream;
 
   String _difficulty = "easy";
   int _unlockedLevel = 1;
   bool _isLoading = true;
   
-  // This Map holds your stars. Key = Level ID, Value = Number of Stars
   Map<int, int> _levelStars = {}; 
 
   @override
@@ -66,7 +64,7 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
     }
   }
 
-  // --- REAL-TIME SYNC FIXED (MERGE STRATEGY) ---
+  // --- UPDATED REAL-TIME SYNC ---
   void _setupRealtimeSync() {
     User? user = _auth.currentUser;
     if (user != null) {
@@ -74,21 +72,25 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
         if (snapshot.exists && mounted) {
           Map<String, dynamic> data = snapshot.data() as Map<String, dynamic>;
 
-          // 1. Sync Unlocked Level (Only update if cloud is higher)
           int cloudUnlocked = data['unlockedLevel'] ?? 1;
-          if (cloudUnlocked > _unlockedLevel) {
-             _unlockedLevel = cloudUnlocked;
-             await _prefs.setUnlockedLevel(cloudUnlocked);
+          String cloudDiff = data['difficulty'] ?? 'easy';
+          
+          // --- LOGIC CHANGE: RESET DETECTION ---
+          // If cloud level is LESS than local level, it implies a reset occurred.
+          // Or if cloud level is GREATER, progress occurred.
+          // In both cases, sync to cloud.
+          if (cloudUnlocked != _unlockedLevel) {
+            _unlockedLevel = cloudUnlocked;
+            await _prefs.setUnlockedLevel(cloudUnlocked);
           }
 
-          // 2. Sync Difficulty
-          String cloudDiff = data['difficulty'] ?? 'easy';
-          _difficulty = cloudDiff;
-          await _prefs.saveDifficulty(cloudDiff);
+          if (cloudDiff != _difficulty) {
+             _difficulty = cloudDiff;
+             await _prefs.saveDifficulty(cloudDiff);
+          }
 
-          // 3. Sync Stars (MERGE FIX)
-          // Start with existing local stars to prevent disappearing
-          Map<int, int> mergedStars = Map.from(_levelStars);
+          // --- STARS SYNC ---
+          Map<int, int> newStars = {};
           
           if (data.containsKey('levelStars') && data['levelStars'] is Map) {
             Map<dynamic, dynamic> starsMap = data['levelStars'];
@@ -96,20 +98,29 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
             starsMap.forEach((key, value) {
               int lvl = int.tryParse(key.toString()) ?? 0;
               int count = int.tryParse(value.toString()) ?? 0;
-              
               if (lvl > 0 && count > 0) {
-                // Update map and save to local storage
-                mergedStars[lvl] = count;
-                _prefs.setStarsForLevel(lvl, count); 
+                newStars[lvl] = count;
               }
             });
           }
 
-          // 4. Update UI with the merged result
+          // If Cloud has NO stars (empty map), we must clear local stars too (Reset case)
+          if (newStars.isEmpty && _levelStars.isNotEmpty) {
+             // It's a reset, clear local stars
+             for (int i = 1; i <= 20; i++) {
+                await _prefs.setStarsForLevel(i, 0); // effectively clear
+             }
+          } else {
+             // Normal sync: Update local with cloud stars
+             newStars.forEach((lvl, count) {
+                _prefs.setStarsForLevel(lvl, count);
+             });
+          }
+
           setState(() {
-            _unlockedLevel = cloudUnlocked > _unlockedLevel ? cloudUnlocked : _unlockedLevel;
+            _unlockedLevel = cloudUnlocked;
             _difficulty = cloudDiff;
-            _levelStars = mergedStars;
+            _levelStars = newStars;
           });
         }
       }, onError: (e) {
@@ -147,7 +158,7 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
     List<int> levels = _getLevelsForDifficulty();
 
     return Scaffold(
-      bottomNavigationBar: BottomNavPanel(),
+      // bottomNavigationBar: BottomNavPanel(), // Ensure this widget exists
       
       body: Container(
         decoration: const BoxDecoration(

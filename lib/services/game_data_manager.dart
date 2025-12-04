@@ -60,7 +60,7 @@ class GameDataManager {
     return null;
   }
 
-  // NEW: Helper method to reset progress
+  // UPDATED RESET HELPER
   Future<void> resetGameProgress() async {
     User? user = _auth.currentUser;
     if (user != null) {
@@ -68,12 +68,13 @@ class GameDataManager {
         await _firestore.collection("users").doc(user.uid).update({
           "currentLevel": 1,
           "unlockedLevel": 1,
-          "score": 0 // Optional: reset score
+          "score": 0,
+          "levelStars": {}, // Clear the stars map
         });
         print("Game progress reset successfully");
       } catch (e) {
         print("Error resetting game progress: $e");
-        throw e; // Rethrow to handle in UI
+        throw e; 
       }
     }
   }
