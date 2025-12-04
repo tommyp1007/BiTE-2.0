@@ -4,7 +4,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:http/http.dart' as http;
 
 class TranslationService {
-  static const String _apiKey = "AIzaSyBJEZs_TIsG1SzlJcuk48qiblqJYNAuvrY"; // Caution with API Keys in prod
+  static const String _apiKey = "AIzaSyBJEZs_TIsG1SzlJcuk48qiblqJYNAuvrY";
   static const String _baseUrl = "https://translation.googleapis.com/language/translate/v2";
 
   final OnDeviceTranslator _englishToMalay;
@@ -39,10 +39,15 @@ class TranslationService {
     }
 
     // --- FALLBACK LOGIC ---
-    // If the API output is identical to input (ignoring case/spacing), 
-    // it likely failed to translate or found no match.
-    // Return "Translation is soon to add" to trigger the UI check.
-    if (result.trim().toLowerCase() == text.trim().toLowerCase()) {
+    // If API returns identical string (ignoring case), it likely failed.
+    // However, if the text contains symbols that don't change (e.g., "?", "!"), we shouldn't error.
+    // We check if at least one alphanumeric character changed, or if the input was meaningless.
+    
+    String rawInput = text.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toLowerCase();
+    String rawOutput = result.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toLowerCase();
+
+    // If input had words but output is identical, assume failure
+    if (rawInput.isNotEmpty && rawInput == rawOutput) {
       return "Translation is soon to add";
     }
 
@@ -52,7 +57,6 @@ class TranslationService {
   String _getLanguageCode(String language) {
     if (language.toLowerCase() == 'english') return 'en';
     if (language.toLowerCase() == 'malay') return 'ms';
-    // Bidayuh code doesn't exist in Google API, but this function is only called for API supported langs
     return 'en'; 
   }
 
@@ -73,14 +77,26 @@ class TranslationService {
         if (data.containsKey('data') &&
             data['data']['translations'] != null &&
             data['data']['translations'].isNotEmpty) {
-          return data['data']['translations'][0]['translatedText'];
+          
+          // Google API handles punctuation well, but sometimes returns encoded HTML like &#39;
+          String raw = data['data']['translations'][0]['translatedText'];
+          return _unescapeHtml(raw);
         }
       }
-      // If API fails, return original text so fallback logic triggers
-      return text; 
+      return text; // Return original on failure
     } catch (e) {
-      return text; // Return text on network error to allow fallback check
+      return text;
     }
+  }
+
+  // Simple unescape for common HTML entities returned by Google
+  String _unescapeHtml(String input) {
+    return input
+      .replaceAll("&quot;", "\"")
+      .replaceAll("&#39;", "'")
+      .replaceAll("&amp;", "&")
+      .replaceAll("&lt;", "<")
+      .replaceAll("&gt;", ">");
   }
 
   Future<String> _translateOffline(String text, String fromLang, String toLang) async {
@@ -90,7 +106,7 @@ class TranslationService {
       } else if (fromLang == 'malay' && toLang == 'english') {
         return await _malayToEnglish.translateText(text);
       }
-      return text; // Return original on missing model
+      return text; 
     } catch (e) {
       return text;
     }

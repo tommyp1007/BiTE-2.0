@@ -23,6 +23,7 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
   bool _isResultVisible = false;
   bool _isLoadingDictionaries = true;
 
+  // Dictionaries
   final Map<String, String> _bidayuhToEnglishDict = {};
   final Map<String, String> _bidayuhToMalayDict = {};
   final Map<String, String> _englishToBidayuhDict = {};
@@ -99,16 +100,13 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
       if (query.isNotEmpty) {
         _handleTranslate();
       } else {
-        if(mounted) setState(() {
-          _isResultVisible = false;
-          _translatedText = "";
-        });
+        if(mounted) setState(() { _translatedText = ""; _isResultVisible = false; });
       }
     });
   }
 
   void _handleTranslate() async {
-    String text = _sourceController.text.trim().toLowerCase();
+    String text = _sourceController.text.trim(); // Keep original casing/punctuation for split
     
     if (text.isEmpty) {
       if (mounted) setState(() { _translatedText = ""; _isResultVisible = false; });
@@ -122,46 +120,36 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
 
     String result = "";
 
-    // ==========================================
-    // STRATEGY: SMART PIVOT TRANSLATION
-    // ==========================================
+    // --- PIVOT STRATEGY (Bidayuh <-> API) ---
 
-    // 1. BIDAYUH -> ENGLISH (Use Malay Pivot)
-    // Convert Bidayuh to Malay (Local DB) -> Send Malay to API -> English
+    // 1. BIDAYUH -> ENGLISH (Pivot via Malay)
     if (_fromLanguage == "Bidayuh" && _toLanguage == "English") {
-      // Step A: Get Rough Malay from DB
+      // Get Rough Malay from DB (Preserving Punctuation)
       String roughMalay = _getBidayuhTranslation(text, "bidayuh", "malay");
-      
-      // If DB doesn't have the words, fail early
       if (roughMalay == "Translation is soon to add") {
         result = roughMalay;
       } else {
-        // Step B: Send Rough Malay to Google Translate API to get proper English grammar
+        // Send to API to fix grammar and translate to English
         result = await _translationService.translate(roughMalay, "Malay", "English");
       }
     }
     
-    // 2. ENGLISH -> BIDAYUH (Use Malay Pivot)
-    // Send English to API -> Malay -> Convert Malay to Bidayuh (Local DB)
+    // 2. ENGLISH -> BIDAYUH (Pivot via Malay)
     else if (_fromLanguage == "English" && _toLanguage == "Bidayuh") {
-      // Step A: Translate English to Malay online
       String properMalay = await _translationService.translate(text, "English", "Malay");
-      
       if (properMalay == "Translation is soon to add") {
         result = properMalay;
       } else {
-        // Step B: Map Malay words to Bidayuh locally
         result = _getBidayuhTranslation(properMalay, "malay", "bidayuh");
       }
     }
 
-    // 3. BIDAYUH -> MALAY (Direct Local)
-    // Bidayuh structure is close enough to Malay to use direct DB mapping
+    // 3. BIDAYUH -> MALAY (Direct DB)
     else if (_fromLanguage == "Bidayuh" && _toLanguage == "Malay") {
       result = _getBidayuhTranslation(text, "bidayuh", "malay");
     }
 
-    // 4. MALAY -> BIDAYUH (Direct Local)
+    // 4. MALAY -> BIDAYUH (Direct DB)
     else if (_fromLanguage == "Malay" && _toLanguage == "Bidayuh") {
       result = _getBidayuhTranslation(text, "malay", "bidayuh");
     }
@@ -179,24 +167,41 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
     }
   }
 
-  // Helper to query the Local HashMaps
   String _getBidayuhTranslation(String text, String fromLang, String toLang) {
-    String cleanedText = text.replaceAll(RegExp(r'[^a-zA-Z0-9\s]'), '').trim();
-    if (cleanedText.isEmpty) return "";
+    if (text.trim().isEmpty) return "";
 
-    List<String> originalWords = cleanedText.split(RegExp(r'\s+'));
+    // 1. Pre-process: Insert spaces around punctuation so they become separate tokens
+    // Matches any character that is NOT a word char, whitespace, or digit
+    // Example: "Ani, ndai?" -> "Ani , ndai ?"
+    String spacedText = text.replaceAllMapped(RegExp(r'([^\w\s]|_)'), (match) {
+      return ' ${match.group(0)} ';
+    });
+
+    List<String> originalWords = spacedText.trim().split(RegExp(r'\s+'));
     List<String> words = List.from(originalWords);
     List<String> translatedParts = [];
+    
     bool hasMissingTranslation = false;
 
     while (words.isNotEmpty) {
       String? phrase;
       String singleWord = words[0];
+      // Lookup version is always lowercase
+      String lookupKey = singleWord.toLowerCase();
       int wordsUsed = 0;
 
-      // Greedy Search for Phrases
+      // 2. Check if token is just punctuation/symbol
+      // If it matches punctuation regex, we just keep it.
+      if (RegExp(r'^[^\w\s]+$').hasMatch(singleWord)) {
+        translatedParts.add(singleWord);
+        words.removeAt(0);
+        continue;
+      }
+
+      // 3. Greedy Phrase Search
       for (int i = words.length; i > 0; i--) {
-        String potentialPhrase = words.sublist(0, i).join(" ");
+        // Create phrase key from first 'i' words
+        String potentialPhrase = words.sublist(0, i).join(" ").toLowerCase();
 
         if (fromLang == 'bidayuh' && toLang == 'english') {
           if (_bidayuhToEnglishDict.containsKey(potentialPhrase)) {
@@ -217,19 +222,20 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
         }
       }
 
-      // Single word fallback
+      // 4. Single word fallback
       if (phrase == null) {
-        if (fromLang == 'bidayuh' && toLang == 'english') phrase = _bidayuhToEnglishDict[singleWord];
-        else if (fromLang == 'bidayuh' && toLang == 'malay') phrase = _bidayuhToMalayDict[singleWord];
-        else if (fromLang == 'english' && toLang == 'bidayuh') phrase = _englishToBidayuhDict[singleWord];
-        else if (fromLang == 'malay' && toLang == 'bidayuh') phrase = _malayToBidayuhDict[singleWord];
+        if (fromLang == 'bidayuh' && toLang == 'english') phrase = _bidayuhToEnglishDict[lookupKey];
+        else if (fromLang == 'bidayuh' && toLang == 'malay') phrase = _bidayuhToMalayDict[lookupKey];
+        else if (fromLang == 'english' && toLang == 'bidayuh') phrase = _englishToBidayuhDict[lookupKey];
+        else if (fromLang == 'malay' && toLang == 'bidayuh') phrase = _malayToBidayuhDict[lookupKey];
         wordsUsed = 1;
       }
 
+      // 5. Result handling
       if (phrase != null) {
         translatedParts.add(phrase);
       } else {
-        // Missing word logic
+        // If it's a WORD (not punctuation) and missing, trigger fallback
         hasMissingTranslation = true;
         break; 
       }
@@ -243,7 +249,15 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
       return "Translation is soon to add";
     }
 
-    return translatedParts.join(" ");
+    // 6. Post-process: Join and clean up spaces before punctuation
+    // Join with spaces -> "What do you do ?"
+    String rawResult = translatedParts.join(" ");
+    // Remove space before punctuation: " ?" -> "?"
+    String cleanedResult = rawResult.replaceAllMapped(RegExp(r'\s+([^\w\s])'), (match) {
+      return match.group(1)!;
+    });
+
+    return cleanedResult;
   }
 
   void _swapLanguages() {
