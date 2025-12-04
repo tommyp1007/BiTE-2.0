@@ -1,14 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart'; // 1. Import
 import 'firebase_options.dart'; 
 import 'theme/app_colors.dart';
-import 'screens/splash_screen.dart'; // <--- Import your new splash screen
+import 'screens/splash_screen.dart'; // Import the new splash screen
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  // 1. Initialize Bindings
+  WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
+
+  // 2. Preserve the Native Splash (Solid Green Screen)
+  // This prevents the white/black flash before Flutter loads
+  FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
+
+  // 3. Initialize Firebase
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // 4. Run App
   runApp(const MyApp());
 }
 
@@ -20,6 +30,8 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'BiTE Translator',
       debugShowCheckedModeBanner: false,
+      
+      // Theme Configuration
       theme: ThemeData(
         primaryColor: AppColors.primary,
         scaffoldBackgroundColor: AppColors.primary,
@@ -34,8 +46,8 @@ class MyApp extends StatelessWidget {
         ),
       ),
       
-      // CHANGE THIS LINE: Use SplashScreen instead of HomeScreen
-      home: const SplashScreen(), 
+      // Start with the Splash Screen
+      home: const SplashScreen(),
     );
   }
 }

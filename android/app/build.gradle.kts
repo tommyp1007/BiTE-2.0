@@ -16,17 +16,23 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // Suppress warnings from third-party libraries
+        allWarningsAsErrors = false
     }
 
     kotlinOptions {
         jvmTarget = JavaVersion.VERSION_17.toString()
+        // Show deprecation and unchecked warnings, but don't fail build
+        freeCompilerArgs += listOf(
+            "-Xlint:deprecation",
+            "-Xlint:unchecked"
+        )
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
+        // TODO: Specify your own unique Application ID
         applicationId = "com.example.bite_flutter"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
+        // Min and target SDK versions
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
@@ -35,8 +41,7 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
+            // Signing config (for release builds, you can add your own later)
             signingConfig = signingConfigs.getByName("debug")
         }
     }

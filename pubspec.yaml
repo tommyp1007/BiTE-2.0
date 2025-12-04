@@ -48,6 +48,7 @@ dev_dependencies:
   
   # Lints for good coding practices
   flutter_lints: ^6.0.0
+  flutter_native_splash: ^2.3.0  # <--- Add this line
 
 flutter:
   uses-material-design: true
@@ -64,3 +65,15 @@ flutter:
   assets:
     - assets/images/
     - assets/audio/
+
+# --- NATIVE SPLASH CONFIGURATION ---
+# This creates a solid green screen immediately when the app opens.
+# We do NOT put the image here because we want the Flutter code 
+# to handle the "Fade In" animation manually.
+flutter_native_splash:
+  color: "#2E7D32" # Matches AppColors.primary
+  # image: assets/images/bite_icon2_bright.png # Commented out to allow fade-in effect
+  android_12:
+    color: "#2E7D32"
+    # image: assets/images/bite_icon2_bright.png # Commented out
+  web: false
