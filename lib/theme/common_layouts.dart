@@ -1,10 +1,10 @@
-import 'dart:io'; // Required for exit(0) on iOS
+import 'dart:io'; // 1. CRITICAL IMPORT: This is required for exit(0) to work on iOS
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter/services.dart'; // Required for SystemNavigator on Android
 import '../theme/app_colors.dart';
 import '../screens/home_screen.dart';
 
-// Matches the header layout pattern
+// --- App Header ---
 class AppHeader extends StatelessWidget {
   final String title;
   final bool showBackArrow;
@@ -21,7 +21,7 @@ class AppHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: EdgeInsets.only(
-        top: MediaQuery.of(context).padding.top + 10, // Handle top safe area manually if needed, or rely on Scaffold
+        top: MediaQuery.of(context).padding.top + 10, 
         left: 10,
         right: 10,
         bottom: 10
@@ -55,15 +55,13 @@ class AppHeader extends StatelessWidget {
   }
 }
 
-// Fixed Bottom Panel
+// --- Bottom Panel (Fixed for iOS) ---
 class BottomNavPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    // We wrap in a generic container for background color
     return Container(
       color: AppColors.secondary,
       child: SafeArea(
-        // SafeArea ensures this doesn't get cut off by the iPhone Home indicator
         top: false, 
         child: Container(
           padding: EdgeInsets.symmetric(vertical: 15),
@@ -74,7 +72,7 @@ class BottomNavPanel extends StatelessWidget {
               Expanded(
                 child: GestureDetector(
                   onTap: () {
-                    // Navigate to Home and clear stack
+                    // Navigate to Home and remove all previous routes to prevent back button loops
                     Navigator.pushAndRemoveUntil(
                       context, 
                       MaterialPageRoute(builder: (_) => HomeScreen()), 
@@ -97,11 +95,12 @@ class BottomNavPanel extends StatelessWidget {
                 child: GestureDetector(
                   onTap: () {
                     if (Platform.isAndroid) {
+                      // Standard Android exit
                       SystemNavigator.pop();
                     } else if (Platform.isIOS) {
-                      // iOS doesn't allow SystemNavigator.pop(). 
-                      // exit(0) kills the process. Note: Apple guidelines discourage this, 
-                      // but it is the only way to programmatically "close" the app.
+                      // iOS FORCE EXIT
+                      // Apple does not support "SystemNavigator.pop".
+                      // We must use exit(0) from 'dart:io' to kill the process.
                       exit(0);
                     }
                   },

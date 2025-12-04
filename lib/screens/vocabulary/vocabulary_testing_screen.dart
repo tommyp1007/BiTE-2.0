@@ -9,7 +9,6 @@ class VocabularyTestingScreen extends StatefulWidget {
 }
 
 class _VocabularyTestingScreenState extends State<VocabularyTestingScreen> {
-  // Comprehensive list merging 'gridItems' and 'wordTranslations' from Java
   final List<Map<String, String>> vocabList = [
     {"word": "Gaon", "img": "gaon", "audio": "gaon.mp3", "eng": "Gown", "mal": "Gaun"},
     {"word": "Jura", "img": "jura", "audio": "jura.mp3", "eng": "Tongue", "mal": "Lidah"},
@@ -47,7 +46,10 @@ class _VocabularyTestingScreenState extends State<VocabularyTestingScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.primary,
+      // Fixed: Moved Panel here
+      bottomNavigationBar: BottomNavPanel(),
       body: SafeArea(
+        bottom: false, 
         child: Column(
           children: [
             // Header
@@ -120,9 +122,6 @@ class _VocabularyTestingScreenState extends State<VocabularyTestingScreen> {
                 },
               ),
             ),
-            
-            // Bottom Panel
-            BottomNavPanel(),
           ],
         ),
       ),

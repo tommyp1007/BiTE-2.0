@@ -34,7 +34,6 @@ class _VocabularyLearningScreenState extends State<VocabularyLearningScreen> {
     super.initState();
     _fetchAudio();
     
-    // Listen to player state changes to update the icon
     _player.onPlayerStateChanged.listen((state) {
       if (mounted) {
         setState(() {
@@ -43,7 +42,6 @@ class _VocabularyLearningScreenState extends State<VocabularyLearningScreen> {
       }
     });
 
-    // Reset icon when audio finishes
     _player.onPlayerComplete.listen((event) {
       if (mounted) {
         setState(() {
@@ -53,7 +51,6 @@ class _VocabularyLearningScreenState extends State<VocabularyLearningScreen> {
     });
   }
 
-  // Replaces Java's DownloadAudioTask
   Future<void> _fetchAudio() async {
     try {
       final ref = FirebaseStorage.instance.ref().child("vocabulary_audio/${widget.audioFileName}");
@@ -90,7 +87,10 @@ class _VocabularyLearningScreenState extends State<VocabularyLearningScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.primary,
+      // Fixed: Moved Panel here
+      bottomNavigationBar: BottomNavPanel(),
       body: SafeArea(
+        bottom: false, // BottomNavPanel handles the bottom area
         child: Column(
           children: [
             // Header
@@ -145,7 +145,6 @@ class _VocabularyLearningScreenState extends State<VocabularyLearningScreen> {
                       child: Opacity(
                         opacity: _isLoadingAudio ? 0.5 : 1.0,
                         child: Image.asset(
-                          // Switching icons based on state like Java code
                           _isPlaying ? 'assets/images/pause.png' : 'assets/images/play.png', 
                           width: 110, 
                           height: 100
@@ -153,19 +152,16 @@ class _VocabularyLearningScreenState extends State<VocabularyLearningScreen> {
                       ),
                     ),
                     
-                    // Result TextView (Placeholder from XML)
+                    // Result TextView
                     SizedBox(height: 30),
                     Text(
                       "", 
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.green) // holo_green_dark
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.green)
                     ),
                   ],
                 ),
               ),
             ),
-            
-            // Bottom Panel
-            BottomNavPanel(),
           ],
         ),
       ),

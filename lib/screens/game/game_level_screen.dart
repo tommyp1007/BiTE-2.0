@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // Required for SystemNavigator
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../theme/app_colors.dart'; 
@@ -7,8 +6,9 @@ import '../../services/shared_preferences_helper.dart';
 import 'play_game_screen.dart';
 import 'game_settings_setup.dart'; 
 import 'word_guess_entry_screen.dart'; 
-// IMPORTANT: Adjust this path to where your HomeScreen is located
-import '../home_screen.dart'; 
+
+// 1. IMPORT COMMON LAYOUTS TO USE THE SHARED BOTTOM PANEL
+import '../../widgets/common_layouts.dart'; 
 
 class GameLevelScreen extends StatefulWidget {
   const GameLevelScreen({Key? key}) : super(key: key);
@@ -47,17 +47,13 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
     }
   }
 
-  /// Updates difficulty locally and syncs with Firebase
   void _updateDifficulty(String newDifficulty) async {
-    // 1. Update UI State
     setState(() {
       _difficulty = newDifficulty;
     });
 
-    // 2. Save to SharedPreferences
     await _prefs.saveDifficulty(newDifficulty);
 
-    // 3. Sync with Firestore
     User? user = _auth.currentUser;
     if (user != null) {
       _db.collection('users').doc(user.uid).update({'difficulty': newDifficulty})
@@ -74,27 +70,28 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
   List<int> _getLevelsForDifficulty() {
     if (_difficulty == 'medium') return [6, 7, 8, 9, 10];
     if (_difficulty == 'hard') return [11, 12, 13, 14, 15];
-    return [1, 2, 3, 4, 5]; // Default Easy
+    return [1, 2, 3, 4, 5]; 
   }
 
-  // --- HELPER: Get Color based on difficulty ---
   Color _getDifficultyColor() {
     switch (_difficulty) {
       case 'medium':
-        return Colors.orange; // Orange for Medium
+        return Colors.orange;
       case 'hard':
-        return Colors.red;    // Red for Hard
+        return Colors.red;    
       default:
-        return Colors.green;  // Green for Easy
+        return Colors.green;  
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Get the 5 levels for the current mode
     List<int> levels = _getLevelsForDifficulty();
 
     return Scaffold(
+      // 2. FIXED: MOVE BOTTOM PANEL HERE
+      bottomNavigationBar: BottomNavPanel(),
+      
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -104,6 +101,7 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
           ),
         ),
         child: SafeArea(
+          bottom: false, // Let Navigation bar handle bottom
           child: _isLoading
               ? const Center(child: CircularProgressIndicator(color: Colors.white))
               : Column(
@@ -114,10 +112,8 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          // --- UPDATED BACK BUTTON ---
                           GestureDetector(
                             onTap: () {
-                              // Use pushReplacement to go back to WordGuessEntryScreen
                               Navigator.pushReplacement(
                                 context,
                                 MaterialPageRoute(builder: (_) => WordGuessEntryScreen()),
@@ -137,15 +133,13 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
                                   shadows: [Shadow(color: Colors.blue, offset: Offset(2, 2), blurRadius: 4)],
                                 ),
                               ),
-                              // --- UPDATED DIFFICULTY TEXT ---
                               Text(
                                 "${_difficulty.toUpperCase()} MODE",
                                 style: TextStyle(
-                                  color: _getDifficultyColor(), // Dynamic Color
-                                  fontSize: 24,                 // Increased Font Size (was 16)
+                                  color: _getDifficultyColor(), 
+                                  fontSize: 24,                 
                                   fontWeight: FontWeight.bold,
                                   shadows: const [
-                                    // Added a white outline shadow to make the color pop against the blue background
                                     Shadow(color: Colors.white, offset: Offset(0, 1), blurRadius: 1),
                                     Shadow(color: Colors.black12, offset: Offset(1, 1), blurRadius: 2)
                                   ],
@@ -154,7 +148,6 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
                             ],
                           ),
                           
-                          // --- SETTINGS BUTTON ---
                           IconButton(
                             icon: const Icon(Icons.settings, color: Colors.white, size: 30),
                             onPressed: () {
@@ -180,24 +173,24 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   _buildLevelButton(levels[0]),
-                                  const SizedBox(width: 40), // Horizontal Gap
+                                  const SizedBox(width: 40), 
                                   _buildLevelButton(levels[1]),
                                 ],
                               ),
                               
-                              const SizedBox(height: 30), // Vertical Gap
+                              const SizedBox(height: 30), 
                               
                               // Row 2: Position 2 and 3
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   _buildLevelButton(levels[2]),
-                                  const SizedBox(width: 40), // Horizontal Gap
+                                  const SizedBox(width: 40), 
                                   _buildLevelButton(levels[3]),
                                 ],
                               ),
 
-                              const SizedBox(height: 30), // Vertical Gap
+                              const SizedBox(height: 30), 
 
                               // Row 3: Position 4 (Centered)
                               Row(
@@ -238,9 +231,6 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
                         ],
                       ),
                     ),
-
-                    // --- NEW BOTTOM PANEL ---
-                    BottomNavPanel(),
                   ],
                 ),
         ),
@@ -266,10 +256,9 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
           ).then((_) => _loadState());
         }
       },
-      // Box Size defined here to ensure they are square
       child: Container(
-        width: 100, // Fixed width
-        height: 100, // Fixed height
+        width: 100, 
+        height: 100, 
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: isLocked 
@@ -278,7 +267,7 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
-          borderRadius: BorderRadius.circular(20), // More rounded corners
+          borderRadius: BorderRadius.circular(20), 
           border: Border.all(color: const Color(0xFF2E6DA4), width: 4),
           boxShadow: const [BoxShadow(color: Colors.black26, offset: Offset(4, 6), blurRadius: 6)],
         ),
@@ -325,53 +314,6 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
           boxShadow: const [BoxShadow(color: Colors.black26, offset: Offset(2, 4), blurRadius: 4)],
         ),
         child: Icon(icon, color: Colors.white, size: 36),
-      ),
-    );
-  }
-}
-
-// --- NEW BOTTOM PANEL CLASS ---
-class BottomNavPanel extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: AppColors.secondary,
-      padding: EdgeInsets.all(15), 
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // Home Button
-          Expanded(
-            child: GestureDetector(
-              onTap: () => Navigator.pushAndRemoveUntil(
-                context, 
-                MaterialPageRoute(builder: (_) => HomeScreen()), 
-                (r) => false
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Image.asset('assets/images/home_page.png', width: 60, height: 60, fit: BoxFit.scaleDown),
-                  Text("Home", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
-                ],
-              ),
-            ),
-          ),
-          
-          // Exit Button
-          Expanded(
-            child: GestureDetector(
-              onTap: () => SystemNavigator.pop(),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Image.asset('assets/images/exit_icon.png', width: 60, height: 60, fit: BoxFit.scaleDown),
-                  Text("Exit", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
-                ],
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
