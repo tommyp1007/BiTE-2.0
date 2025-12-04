@@ -4,7 +4,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:http/http.dart' as http;
 
 class TranslationService {
-  static const String _apiKey = "AIzaSyBJEZs_TIsG1SzlJcuk48qiblqJYNAuvrY"; // Note: Secure this in production
+  static const String _apiKey = "AIzaSyBJEZs_TIsG1SzlJcuk48qiblqJYNAuvrY"; // Caution: Secure this key
   static const String _baseUrl = "https://translation.googleapis.com/language/translate/v2";
 
   final OnDeviceTranslator _englishToMalay;
@@ -38,11 +38,10 @@ class TranslationService {
     }
 
     // --- FALLBACK LOGIC ---
-    // If we are online, we TRUST the API output, even if it's identical.
-    // Example: "Hello" (En) -> "Hello" (Ms) is valid.
-    // Only return the "soon to add" error if the result is empty or specifically indicates failure.
-    // However, if we want to be safe, we only check if the API returns NO content.
-    if (result.trim().isEmpty) {
+    // If the result is empty (API failed), return the error.
+    // If result is identical to input, we ALLOW it now (e.g. "Hello" -> "Hello")
+    // unless it is the explicit default failure message.
+    if (result.trim().isEmpty || result == "Translation is soon to add") {
       return "Translation is soon to add";
     }
 
@@ -77,11 +76,10 @@ class TranslationService {
           return _unescapeHtml(raw);
         }
       }
-      // If API fails, we return the input text so it just shows up 
-      // (Better than crashing, user will see untranslated text)
-      return text; 
+      // If API fails with error, return special string to trigger fallback
+      return "Translation is soon to add"; 
     } catch (e) {
-      return text;
+      return "Translation is soon to add";
     }
   }
 

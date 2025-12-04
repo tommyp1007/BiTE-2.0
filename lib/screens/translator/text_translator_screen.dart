@@ -100,13 +100,13 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
       if (query.isNotEmpty) {
         _handleTranslate();
       } else {
-        if(mounted) setState(() { _translatedText = ""; _isResultVisible = false; });
+        if (mounted) setState(() { _translatedText = ""; _isResultVisible = false; });
       }
     });
   }
 
   void _handleTranslate() async {
-    String text = _sourceController.text.trim(); // Preserve punctuation
+    String text = _sourceController.text.trim();
     
     if (text.isEmpty) {
       if (mounted) setState(() { _translatedText = ""; _isResultVisible = false; });
@@ -120,7 +120,12 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
 
     String result = "";
 
+    // ==========================================
+    // STRATEGY: SMART PIVOT TRANSLATION
+    // ==========================================
+
     // 1. BIDAYUH -> ENGLISH (Pivot via Malay)
+    // Why? Google Translate (Ms->En) is very good at fixing grammar.
     if (_fromLanguage == "Bidayuh" && _toLanguage == "English") {
       String roughMalay = _getBidayuhTranslation(text, "bidayuh", "malay");
       if (roughMalay == "Translation is soon to add") {
@@ -130,10 +135,23 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
       }
     }
     
-    // 2. ENGLISH -> BIDAYUH (Pivot via Malay)
+    // 2. BIDAYUH -> MALAY (Pivot via English) -- [NEW FIX]
+    // Why? Direct DB is "word-for-word". Converting to English first allows Google (En->Ms) to apply proper Malay grammar.
+    else if (_fromLanguage == "Bidayuh" && _toLanguage == "Malay") {
+      String roughEnglish = _getBidayuhTranslation(text, "bidayuh", "english");
+      
+      if (roughEnglish == "Translation is soon to add") {
+        // Fallback to direct DB if English mapping is missing
+        result = _getBidayuhTranslation(text, "bidayuh", "malay");
+      } else {
+        // Send "Rough English" to API to get "Proper Malay"
+        result = await _translationService.translate(roughEnglish, "English", "Malay");
+      }
+    }
+
+    // 3. ENGLISH -> BIDAYUH (Pivot via Malay)
     else if (_fromLanguage == "English" && _toLanguage == "Bidayuh") {
       String properMalay = await _translationService.translate(text, "English", "Malay");
-      // Check strict failure for API
       if (properMalay == "Translation is soon to add") {
         result = properMalay;
       } else {
@@ -141,12 +159,8 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
       }
     }
 
-    // 3. BIDAYUH -> MALAY (Direct DB)
-    else if (_fromLanguage == "Bidayuh" && _toLanguage == "Malay") {
-      result = _getBidayuhTranslation(text, "bidayuh", "malay");
-    }
-
     // 4. MALAY -> BIDAYUH (Direct DB)
+    // Malay structure is closest to Bidayuh, so direct mapping is usually acceptable.
     else if (_fromLanguage == "Malay" && _toLanguage == "Bidayuh") {
       result = _getBidayuhTranslation(text, "malay", "bidayuh");
     }
@@ -167,7 +181,7 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
   String _getBidayuhTranslation(String text, String fromLang, String toLang) {
     if (text.trim().isEmpty) return "";
 
-    // Separate punctuation
+    // Separate punctuation into tokens
     String spacedText = text.replaceAllMapped(RegExp(r'([^\w\s]|_)'), (match) {
       return ' ${match.group(0)} ';
     });
@@ -184,7 +198,7 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
       String lookupKey = singleWord.toLowerCase();
       int wordsUsed = 0;
 
-      // Keep punctuation as is
+      // Keep punctuation
       if (RegExp(r'^[^\w\s]+$').hasMatch(singleWord)) {
         translatedParts.add(singleWord);
         words.removeAt(0);
@@ -239,8 +253,8 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
       return "Translation is soon to add";
     }
 
-    // Clean up spaces before punctuation
     String rawResult = translatedParts.join(" ");
+    // Remove space before punctuation
     return rawResult.replaceAllMapped(RegExp(r'\s+([^\w\s])'), (match) {
       return match.group(1)!;
     });
@@ -257,7 +271,6 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Detect keyboard state
     final double keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
     final bool isKeyboardOpen = keyboardHeight > 0;
 
@@ -275,7 +288,7 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
               Expanded(
                 child: Stack(
                   children: [
-                    // Main Content
+                    // Main Content Card
                     Container(
                       margin: EdgeInsets.only(top: 10),
                       padding: EdgeInsets.only(bottom: 70),
@@ -372,8 +385,6 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
                                 if (_sourceController.text.isNotEmpty) _handleTranslate();
                               }),
 
-                              // --- HIDE KEYBOARD BUTTON ---
-                              // Only visible when keyboard is open
                               if (isKeyboardOpen)
                                 Container(
                                   margin: EdgeInsets.only(left: 8),
