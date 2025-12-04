@@ -580,7 +580,7 @@ class _PlayGameScreenState extends State<PlayGameScreen> with WidgetsBindingObse
                           ),
                           SizedBox(width: 10),
                           
-                          // --- UPDATED BACKSPACE BUTTON ---
+                          // --- BACKSPACE BUTTON ---
                           GestureDetector(
                             onTap: _onBackspace,     // Tap to delete one
                             onLongPress: _onClearAll, // Long press to delete all

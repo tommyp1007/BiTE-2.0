@@ -7,7 +7,6 @@ import 'play_game_screen.dart';
 import 'game_settings_setup.dart'; 
 import 'word_guess_entry_screen.dart'; 
 
-// 1. IMPORT COMMON LAYOUTS TO USE THE SHARED BOTTOM PANEL
 import '../../widgets/common_layouts.dart'; 
 
 class GameLevelScreen extends StatefulWidget {
@@ -89,7 +88,6 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
     List<int> levels = _getLevelsForDifficulty();
 
     return Scaffold(
-      // 2. FIXED: MOVE BOTTOM PANEL HERE
       bottomNavigationBar: BottomNavPanel(),
       
       body: Container(
@@ -101,7 +99,7 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
           ),
         ),
         child: SafeArea(
-          bottom: false, // Let Navigation bar handle bottom
+          bottom: false, 
           child: _isLoading
               ? const Center(child: CircularProgressIndicator(color: Colors.white))
               : Column(

@@ -21,6 +21,8 @@ class TranslationService {
   Future<String> translate(String text, String fromLang, String toLang) async {
     if (text.isEmpty) return "";
     
+    // We process lowercase for logic, but TextTranslatorScreen will handle the final Casing
+    // based on original input.
     String cleanFrom = fromLang.toLowerCase();
     String cleanTo = toLang.toLowerCase();
 
@@ -38,6 +40,7 @@ class TranslationService {
     }
 
     // --- FALLBACK LOGIC ---
+    // Strict fallback only if result is empty or error message.
     if (result.trim().isEmpty || result == "Translation is soon to add") {
       return "Translation is soon to add";
     }

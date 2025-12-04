@@ -106,12 +106,19 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
   }
 
   void _handleTranslate() async {
-    String text = _sourceController.text.trim();
-    
-    if (text.isEmpty) {
+    // 1. Capture Original Text for Casing Detection
+    String originalText = _sourceController.text.trim();
+    if (originalText.isEmpty) {
       if (mounted) setState(() { _translatedText = ""; _isResultVisible = false; });
       return;
     }
+
+    // 2. Detect Casing Pattern
+    bool isAllUpper = originalText == originalText.toUpperCase() && originalText != originalText.toLowerCase();
+    bool isAllLower = originalText == originalText.toLowerCase();
+
+    // 3. Process in Lowercase for Logic
+    String processingText = originalText.toLowerCase();
 
     if (_fromLanguage == _toLanguage) {
       if (mounted) setState(() { _translatedText = "Unsupported translation pair."; _isResultVisible = true; });
@@ -120,14 +127,11 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
 
     String result = "";
 
-    // ==========================================
-    // STRATEGY: SMART PIVOT TRANSLATION
-    // ==========================================
+    // --- TRANSLATION LOGIC ---
 
-    // 1. BIDAYUH -> ENGLISH (Pivot via Malay DB)
-    // Bidayuh (DB) -> Rough Malay (DB) -> English (API)
+    // BIDAYUH -> ENGLISH (Pivot via Malay)
     if (_fromLanguage == "Bidayuh" && _toLanguage == "English") {
-      String roughMalay = _getBidayuhTranslation(text, "bidayuh", "malay");
+      String roughMalay = _getBidayuhTranslation(processingText, "bidayuh", "malay");
       if (roughMalay == "Translation is soon to add") {
         result = roughMalay;
       } else {
@@ -135,31 +139,33 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
       }
     }
     
-    // 2. BIDAYUH -> MALAY (Double Pivot: DB Malay -> API English -> API Malay)
-    // This ensures vocab comes from DB ("Akuk"->"Saya") but grammar comes from API re-structuring.
+    // BIDAYUH -> MALAY (Hybrid: Direct or Pivot)
     else if (_fromLanguage == "Bidayuh" && _toLanguage == "Malay") {
-      // Step A: Get correct words from DB (Rough Malay)
-      String roughMalay = _getBidayuhTranslation(text, "bidayuh", "malay");
+      String directMalay = _getBidayuhTranslation(processingText, "bidayuh", "malay");
       
-      if (roughMalay == "Translation is soon to add") {
-        result = roughMalay;
+      if (directMalay == "Translation is soon to add") {
+        result = directMalay;
       } else {
-        // Step B: Send to English API to fix structure (e.g. "Minum racun saya" -> "I drink poison")
-        String tempEnglish = await _translationService.translate(roughMalay, "Malay", "English");
-        
-        if (tempEnglish == "Translation is soon to add") {
-           result = roughMalay; // Fallback
+        // Check if single word (ignoring symbols)
+        int wordCount = processingText.replaceAll(RegExp(r'[^\w\s]'), '').trim().split(RegExp(r'\s+')).length;
+
+        if (wordCount <= 1) {
+          result = directMalay; // Single word -> Direct DB
         } else {
-           // Step C: Send back to Malay API (e.g. "I drink poison" -> "Saya minum racun")
-           result = await _translationService.translate(tempEnglish, "English", "Malay");
+          String roughEnglish = _getBidayuhTranslation(processingText, "bidayuh", "english");
+          if (roughEnglish != "Translation is soon to add") {
+             String apiResult = await _translationService.translate(roughEnglish, "English", "Malay");
+             result = (apiResult != "Translation is soon to add") ? apiResult : directMalay;
+          } else {
+             result = directMalay;
+          }
         }
       }
     }
 
-    // 3. ENGLISH -> BIDAYUH (Pivot via Malay)
-    // English -> Malay (API) -> Bidayuh (DB)
+    // ENGLISH -> BIDAYUH (Pivot via Malay)
     else if (_fromLanguage == "English" && _toLanguage == "Bidayuh") {
-      String properMalay = await _translationService.translate(text, "English", "Malay");
+      String properMalay = await _translationService.translate(processingText, "English", "Malay");
       if (properMalay == "Translation is soon to add") {
         result = properMalay;
       } else {
@@ -167,14 +173,25 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
       }
     }
 
-    // 4. MALAY -> BIDAYUH (Direct DB)
+    // MALAY -> BIDAYUH (Direct DB)
     else if (_fromLanguage == "Malay" && _toLanguage == "Bidayuh") {
-      result = _getBidayuhTranslation(text, "malay", "bidayuh");
+      result = _getBidayuhTranslation(processingText, "malay", "bidayuh");
     }
 
-    // 5. STANDARD ONLINE (English <-> Malay)
+    // STANDARD ONLINE (English <-> Malay)
     else {
-      result = await _translationService.translate(text, _fromLanguage, _toLanguage);
+      result = await _translationService.translate(processingText, _fromLanguage, _toLanguage);
+    }
+
+    // 4. APPLY CASING TO RESULT
+    // Only apply if it's a valid translation
+    if (result != "Translation is soon to add") {
+      if (isAllUpper) {
+        result = result.toUpperCase();
+      } else if (isAllLower) {
+        result = result.toLowerCase();
+      }
+      // If mixed/sentence case, leave it as API/DB returned it
     }
 
     if (mounted) {
@@ -188,8 +205,9 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
   String _getBidayuhTranslation(String text, String fromLang, String toLang) {
     if (text.trim().isEmpty) return "";
 
-    // Separate punctuation
-    String spacedText = text.replaceAllMapped(RegExp(r'([^\w\s]|_)'), (match) {
+    // Separate ANY non-word character (punctuations/symbols) into tokens
+    // Matches anything that is NOT a word char (a-z, 0-9, _) AND NOT whitespace
+    String spacedText = text.replaceAllMapped(RegExp(r'([^\w\s])'), (match) {
       return ' ${match.group(0)} ';
     });
 
@@ -205,9 +223,9 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
       String lookupKey = singleWord.toLowerCase();
       int wordsUsed = 0;
 
-      // Keep punctuation
+      // Detect if token is a Symbol/Punctuation
       if (RegExp(r'^[^\w\s]+$').hasMatch(singleWord)) {
-        translatedParts.add(singleWord);
+        translatedParts.add(singleWord); // Keep symbol exactly as is
         words.removeAt(0);
         continue;
       }
@@ -260,6 +278,7 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
       return "Translation is soon to add";
     }
 
+    // Join and clean up spaces before punctuation
     String rawResult = translatedParts.join(" ");
     return rawResult.replaceAllMapped(RegExp(r'\s+([^\w\s])'), (match) {
       return match.group(1)!;

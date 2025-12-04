@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:audioplayers/audioplayers.dart'; // REQUIRED IMPORT
 import '../../theme/app_colors.dart'; 
 
 class GameSettingsScreen extends StatefulWidget {
-  // Add callbacks to notify parent immediately
   final Function(double)? onBgmVolumeChanged;
   final Function(double)? onSfxVolumeChanged;
-  final Function(bool)? onVibrationChanged; // NEW CALLBACK
+  final Function(bool)? onVibrationChanged;
 
   const GameSettingsScreen({
     Key? key, 
@@ -21,6 +21,9 @@ class GameSettingsScreen extends StatefulWidget {
 }
 
 class _GameSettingsScreenState extends State<GameSettingsScreen> {
+  // Local audio player just for testing the sound volume
+  final AudioPlayer _testSfxPlayer = AudioPlayer();
+
   double _bgmVolume = 0.5;
   double _sfxVolume = 1.0;
   bool _vibrationEnabled = true;
@@ -29,6 +32,12 @@ class _GameSettingsScreenState extends State<GameSettingsScreen> {
   void initState() {
     super.initState();
     _loadSettings();
+  }
+
+  @override
+  void dispose() {
+    _testSfxPlayer.dispose(); // Clean up player
+    super.dispose();
   }
 
   void _loadSettings() async {
@@ -54,24 +63,29 @@ class _GameSettingsScreenState extends State<GameSettingsScreen> {
   void _updateSfxVolume(double value) async {
     setState(() => _sfxVolume = value);
     
+    // Notify parent to update main game
     if (widget.onSfxVolumeChanged != null) {
       widget.onSfxVolumeChanged!(value);
     }
 
+    // Save to Prefs
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble('sfx_volume', value);
+
+    // --- PLAY TEST SOUND HERE ---
+    await _testSfxPlayer.setVolume(value);
+    await _testSfxPlayer.stop(); // Stop any currently playing sound
+    await _testSfxPlayer.play(AssetSource('audio/pop.mp3')); // Play pop to test
   }
 
   void _toggleVibration(bool value) async {
     setState(() => _vibrationEnabled = value);
 
-    // Notify parent immediately
     widget.onVibrationChanged?.call(value);
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('vibration_enabled', value);
 
-    // ⭐ Trigger vibration instantly when turned ON
     if (value) {
       HapticFeedback.mediumImpact();
     }
@@ -155,7 +169,7 @@ class _GameSettingsScreenState extends State<GameSettingsScreen> {
                             max: 1.0,
                             activeColor: AppColors.secondary,
                             inactiveColor: Colors.white30,
-                            onChanged: _updateSfxVolume,
+                            onChanged: _updateSfxVolume, // This triggers the pop sound
                           ),
                         ),
                         Text("${(_sfxVolume * 100).toInt()}%", style: const TextStyle(color: Colors.white)),
