@@ -38,7 +38,7 @@ class AppHeader extends StatelessWidget {
               ),
             ),
           
-          Image.asset('assets/images/bite_icon2_bright.png', width: 60, height: 70, fit: BoxFit.contain),
+          Image.asset('assets/images/bite_icon.png', width: 60, height: 70, fit: BoxFit.contain),
           SizedBox(width: 8), 
           
           Expanded(

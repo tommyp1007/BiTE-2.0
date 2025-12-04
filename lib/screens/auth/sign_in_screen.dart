@@ -122,7 +122,7 @@ class _SignInScreenState extends State<SignInScreen> {
                     ),
                   ),
                   
-                  Image.asset('assets/images/bite_icon2_bright.png', width: 100, height: 100),
+                  Image.asset('assets/images/bite_icon.png', width: 100, height: 100),
                   SizedBox(height: 20),
                   
                   Text(

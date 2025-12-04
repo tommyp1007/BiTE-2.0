@@ -145,7 +145,7 @@ class _HomeScreenState extends State<HomeScreen> {
               padding: EdgeInsets.all(10),
               child: Row(
                 children: [
-                  Image.asset('assets/images/bite_icon2_bright.png', width: 60, height: 60, fit: BoxFit.contain),
+                  Image.asset('assets/images/bite_icon.png', width: 60, height: 60, fit: BoxFit.contain),
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(

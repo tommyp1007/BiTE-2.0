@@ -153,7 +153,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   ),
                 ),
             
-                Image.asset('assets/images/bite_icon2_bright.png', width: 100, height: 100),
+                Image.asset('assets/images/bite_icon.png', width: 100, height: 100),
                 SizedBox(height: 10),
                 Text("Sign Up", style: TextStyle(fontSize: 25, fontWeight: FontWeight.bold, color: AppColors.white)),
                 

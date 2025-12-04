@@ -114,7 +114,7 @@ class _GameOverScreenState extends State<GameOverScreen> {
                         onTap: _handleExit,
                         child: Image.asset('assets/images/back_icon.png', width: 40, height: 40)
                       ),
-                      Expanded(child: Center(child: Image.asset('assets/images/bite_icon2_bright.png', width: 60, height: 70))),
+                      Expanded(child: Center(child: Image.asset('assets/images/bite_icon.png', width: 60, height: 70))),
                       Text("BiTE Translator", style: TextStyle(color: Colors.white, fontSize: 23, fontWeight: FontWeight.bold)),
                     ],
                   ),
