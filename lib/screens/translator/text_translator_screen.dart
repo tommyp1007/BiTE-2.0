@@ -1,3 +1,4 @@
+import 'dart:async'; // Required for Timer (Debouncing)
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../theme/app_colors.dart';
@@ -14,7 +15,10 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
   final TextEditingController _sourceController = TextEditingController();
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  String _translatedText = "Translated Text Here";
+  // Debounce Timer for auto-translation
+  Timer? _debounce;
+
+  String _translatedText = "";
   String _fromLanguage = "English";
   String _toLanguage = "Malay";
   bool _isResultVisible = false;
@@ -29,6 +33,12 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
   void initState() {
     super.initState();
     _fetchTranslationsFromFirestore();
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel(); // Cancel timer to prevent memory leaks
+    super.dispose();
   }
 
   Future<void> _fetchTranslationsFromFirestore() async {
@@ -84,24 +94,40 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
     }
   }
 
-  void _handleTranslate() async {
-    // Note: Removed Unfocus here so keyboard doesn't close every time you switch language
-    // FocusScope.of(context).unfocus(); 
+  // Real-time translation trigger
+  void _onSearchChanged(String query) {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 800), () {
+      if (query.isNotEmpty) {
+        _handleTranslate();
+      } else {
+        setState(() {
+          _isResultVisible = false;
+          _translatedText = "";
+        });
+      }
+    });
+  }
 
+  void _handleTranslate() async {
     String text = _sourceController.text.trim().toLowerCase();
     if (text.isEmpty) {
-      setState(() {
-        _translatedText = "Please enter text to translate.";
-        _isResultVisible = true;
-      });
+      if (mounted) {
+        setState(() {
+          _translatedText = "";
+          _isResultVisible = false;
+        });
+      }
       return;
     }
 
     if (_fromLanguage == _toLanguage) {
-      setState(() {
-        _translatedText = "Unsupported translation pair.";
-        _isResultVisible = true;
-      });
+      if (mounted) {
+        setState(() {
+          _translatedText = "Unsupported translation pair.";
+          _isResultVisible = true;
+        });
+      }
       return;
     }
 
@@ -109,50 +135,43 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
     if (_fromLanguage == "Bidayuh" || _toLanguage == "Bidayuh") {
       String result = _getBidayuhTranslation(
           text, _fromLanguage.toLowerCase(), _toLanguage.toLowerCase());
+      if (mounted) {
+        setState(() {
+          _translatedText = result;
+          _isResultVisible = true;
+        });
+      }
+      return;
+    }
+
+    // External API Logic
+    String result = await _translationService.translate(text, _fromLanguage, _toLanguage);
+
+    if (mounted) {
       setState(() {
         _translatedText = result;
         _isResultVisible = true;
       });
-      return;
-    }
-
-    // External API Logic (Google/ML Kit)
-    setState(() {
-      _translatedText = "Translating...";
-      _isResultVisible = true;
-    });
-
-    String result = await _translationService.translate(text, _fromLanguage, _toLanguage);
-
-    if (mounted) {
-      setState(() => _translatedText = result);
     }
   }
 
   String _getBidayuhTranslation(String text, String fromLang, String toLang) {
-    // 1. Clean input
     String cleanedText = text.replaceAll(RegExp(r'[^a-zA-Z0-9\s]'), '').trim();
-    // Keep punctuation to append at the end
     String punctuation = text.replaceAll(RegExp(r'[a-zA-Z0-9\s]'), '');
 
-    if (cleanedText.isEmpty) return "Please enter valid text";
+    if (cleanedText.isEmpty) return "";
 
-    // Split text into list of words to check if it is a sentence or single word
     List<String> originalWords = cleanedText.split(RegExp(r'\s+'));
-    
-    // CHECK: Is the input just one word?
     bool isSingleWordInput = originalWords.length == 1;
 
-    List<String> words = List.from(originalWords); // Create a mutable copy for processing
+    List<String> words = List.from(originalWords);
     List<String> translatedParts = [];
 
-    // 2. Loop through words
     while (words.isNotEmpty) {
       String? phrase;
       String singleWord = words[0];
       int wordsUsed = 0;
 
-      // Try to find the longest matching phrase first
       for (int i = words.length; i > 0; i--) {
         String potentialPhrase = words.sublist(0, i).join(" ");
 
@@ -183,7 +202,6 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
         }
       }
 
-      // 3. Fallback to single word if phrase not found
       if (phrase == null) {
         if (fromLang == 'bidayuh' && toLang == 'english') {
           phrase = _bidayuhToEnglishDict[singleWord];
@@ -197,21 +215,16 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
         wordsUsed = 1;
       }
 
-      // 4. Combined Logic for Not Found
       if (phrase != null) {
         translatedParts.add(phrase);
       } else {
-        // Word not found
         if (isSingleWordInput) {
-          // If the user only typed ONE word, and it wasn't found, return specific error
           return "Translation is soon to add";
         } else {
-          // If the user typed a SENTENCE, and this specific word wasn't found, use "_"
           translatedParts.add("_");
         }
       }
 
-      // Remove the processed words from the list
       if (words.isNotEmpty) {
         words.removeRange(0, wordsUsed > 0 ? wordsUsed : 1);
       }
@@ -220,163 +233,244 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
     return translatedParts.join(" ") + punctuation;
   }
 
+  void _swapLanguages() {
+    setState(() {
+      String temp = _fromLanguage;
+      _fromLanguage = _toLanguage;
+      _toLanguage = temp;
+      
+      if (_sourceController.text.isNotEmpty) {
+        _handleTranslate();
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    // This value tells us how high the keyboard is
+    final double keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
+
     return Scaffold(
       backgroundColor: AppColors.primary,
-      // Fixed: moved bottom panel to property
+      // We keep the BottomNavPanel here. Standard behavior is it gets covered by keyboard.
+      // If no keyboard, it shows at bottom.
       bottomNavigationBar: BottomNavPanel(),
-      resizeToAvoidBottomInset: false,
+      
+      // IMPORTANT: Set to false so we can manage the layout manually with Stack
+      resizeToAvoidBottomInset: false, 
 
       body: SafeArea(
         bottom: false,
-        child: Column(
-          children: [
-            // App Header
-            AppHeader(title: "BiTE Translator"),
+        child: GestureDetector(
+          // HitTestBehavior.translucent ensures taps on blank areas are caught
+          onTap: () {
+            FocusScope.of(context).unfocus(); // Close keyboard when tapping outside
+          },
+          child: Column(
+            children: [
+              // App Header
+              AppHeader(title: "BiTE Translator"),
 
-            Expanded(
-              child: SingleChildScrollView(
-                physics: BouncingScrollPhysics(),
-                child: Column(
+              // We use Expanded + Stack to handle the Floating Language Bar
+              Expanded(
+                child: Stack(
                   children: [
-                    SizedBox(height: 20),
-                    Text(
-                      "Text Translator",
-                      style: TextStyle(
-                          color: AppColors.white,
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold),
-                    ),
-
-                    // Language Spinners
+                    // 1. The Main Content (White Card)
                     Container(
-                      margin: EdgeInsets.fromLTRB(20, 40, 20, 0),
-                      padding: EdgeInsets.symmetric(horizontal: 5),
+                      margin: EdgeInsets.only(top: 10),
+                      // Add bottom margin to ensure content isn't hidden behind the language bar
+                      // 70 is approx height of language bar
+                      padding: EdgeInsets.only(bottom: 70), 
                       decoration: BoxDecoration(
-                          color: AppColors.white,
-                          borderRadius: BorderRadius.circular(15)),
-                      child: Row(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.only(
+                          topLeft: Radius.circular(30),
+                          topRight: Radius.circular(30),
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black12,
+                            blurRadius: 10,
+                            offset: Offset(0, -5),
+                          )
+                        ],
+                      ),
+                      child: Column(
                         children: [
+                          // Input Text Field
                           Expanded(
-                              child: _buildDropdown(
-                                  (v) {
-                                    setState(() => _fromLanguage = v!);
-                                    // AUTO UPDATE: If text exists, translate immediately
-                                    if(_sourceController.text.isNotEmpty) {
-                                      _handleTranslate();
-                                    }
-                                  },
-                                  _fromLanguage)),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 10),
-                            child: Icon(Icons.compare_arrows,
-                                color: Colors.black, size: 24),
+                            flex: 1, 
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+                              child: TextField(
+                                controller: _sourceController,
+                                maxLines: null, 
+                                expands: true, 
+                                style: TextStyle(
+                                  fontSize: 28, 
+                                  color: Colors.black87,
+                                  height: 1.3
+                                ),
+                                decoration: InputDecoration(
+                                  hintText: "Enter text",
+                                  hintStyle: TextStyle(
+                                    fontSize: 28, 
+                                    color: Colors.grey.shade400
+                                  ),
+                                  border: InputBorder.none,
+                                  contentPadding: EdgeInsets.zero,
+                                ),
+                                // AUTO-TRANSLATE LOGIC HERE
+                                onChanged: _onSearchChanged, 
+                              ),
+                            ),
                           ),
-                          Expanded(
-                              child: _buildDropdown(
-                                  (v) {
-                                    setState(() => _toLanguage = v!);
-                                    // AUTO UPDATE: If text exists, translate immediately
-                                    if(_sourceController.text.isNotEmpty) {
-                                      _handleTranslate();
-                                    }
-                                  },
-                                  _toLanguage)),
+
+                          // Divider
+                          if (_isResultVisible && _translatedText.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 20),
+                              child: Divider(color: Colors.grey.shade300, thickness: 1),
+                            ),
+
+                          // Result Display
+                          if (_isResultVisible && _translatedText.isNotEmpty)
+                            Expanded(
+                              flex: 1, 
+                              child: Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(24),
+                                child: SingleChildScrollView(
+                                  physics: BouncingScrollPhysics(),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        _toLanguage.toUpperCase(),
+                                        style: TextStyle(
+                                          color: AppColors.primary,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 1.2
+                                        ),
+                                      ),
+                                      SizedBox(height: 8),
+                                      Text(
+                                        _translatedText,
+                                        style: TextStyle(
+                                          fontSize: 28,
+                                          color: AppColors.primary,
+                                          fontWeight: FontWeight.w500,
+                                          height: 1.3
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
                         ],
                       ),
                     ),
 
-                    // Input Field
-                    Padding(
-                      padding: EdgeInsets.fromLTRB(20, 20, 20, 0),
-                      child: TextField(
-                        controller: _sourceController,
-                        maxLines: 4,
-                        // Add listener or onSubmitted if you want enter key to work, 
-                        // but button is fine
-                        style: TextStyle(fontSize: 20, color: AppColors.black),
-                        decoration: InputDecoration(
-                          hintText: "Enter your text",
-                          filled: true,
-                          fillColor: AppColors.white,
-                          enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(15),
-                              borderSide: BorderSide.none),
-                          focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(15),
-                              borderSide: BorderSide.none),
-                          hintStyle: TextStyle(color: AppColors.secondary),
+                    // 2. The Floating Language Control Bar
+                    // Positioned dynamically based on keyboard height
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: keyboardHeight, // Moves up when keyboard opens
+                      child: Container(
+                        color: Colors.white,
+                        padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
+                        child: Container(
+                          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: AppColors.secondary.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(30),
+                            border: Border.all(color: AppColors.secondary.withOpacity(0.3))
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              _buildLanguageButton(
+                                _fromLanguage, 
+                                (val) {
+                                  setState(() => _fromLanguage = val);
+                                  if(_sourceController.text.isNotEmpty) _handleTranslate();
+                                }
+                              ),
+
+                              IconButton(
+                                icon: Icon(Icons.swap_horiz, color: AppColors.primary, size: 28),
+                                onPressed: _swapLanguages,
+                              ),
+
+                              _buildLanguageButton(
+                                _toLanguage, 
+                                (val) {
+                                  setState(() => _toLanguage = val);
+                                  if(_sourceController.text.isNotEmpty) _handleTranslate();
+                                }
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
-
-                    // Translate Button
-                    Container(
-                      width: double.infinity,
-                      padding: EdgeInsets.fromLTRB(20, 20, 20, 0),
-                      child: ElevatedButton(
-                        onPressed:
-                            _isLoadingDictionaries ? null : () {
-                              FocusScope.of(context).unfocus(); // Close keyboard on manual press
-                              _handleTranslate();
-                            },
-                        style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.secondary,
-                            padding: EdgeInsets.symmetric(vertical: 10),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(15))),
-                        child: _isLoadingDictionaries
-                            ? SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                    color: Colors.white, strokeWidth: 2))
-                            : Text("Translate",
-                                style: TextStyle(
-                                    fontSize: 20, color: AppColors.white)),
-                      ),
-                    ),
-
-                    // Result Display
-                    if (_isResultVisible)
-                      Container(
-                        margin: EdgeInsets.fromLTRB(20, 10, 20, 20),
-                        padding: EdgeInsets.all(16),
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                            color: AppColors.white,
-                            borderRadius: BorderRadius.circular(15)),
-                        child: Text(
-                          _translatedText,
-                          style: TextStyle(
-                              fontSize: 17,
-                              color: AppColors.primary,
-                              letterSpacing: 0.03),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
                   ],
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildDropdown(ValueChanged<String?> onChanged, String val) {
-    return DropdownButtonHideUnderline(
-      child: DropdownButton<String>(
-        value: val,
-        isExpanded: true,
-        items: ["English", "Malay", "Bidayuh"]
-            .map((e) =>
-                DropdownMenuItem(value: e, child: Center(child: Text(e))))
-            .toList(),
-        onChanged: onChanged,
+  Widget _buildLanguageButton(String currentLang, Function(String) onSelect) {
+    return InkWell(
+      onTap: () {
+        // Dismiss keyboard before showing modal to avoid UI glitches
+        FocusScope.of(context).unfocus();
+        _showLanguagePicker(context, (val) {
+          onSelect(val);
+        });
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Text(
+          currentLang,
+          style: TextStyle(
+            color: AppColors.primary,
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
       ),
+    );
+  }
+
+  void _showLanguagePicker(BuildContext context, Function(String) onSelect) {
+    showModalBottomSheet(
+      context: context,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) {
+        return Container(
+          padding: EdgeInsets.all(20),
+          height: 250,
+          child: Column(
+            children: ["English", "Malay", "Bidayuh"].map((lang) {
+              return ListTile(
+                title: Text(lang, textAlign: TextAlign.center, style: TextStyle(fontSize: 18)),
+                onTap: () {
+                  onSelect(lang);
+                  Navigator.pop(ctx);
+                },
+              );
+            }).toList(),
+          ),
+        );
+      }
     );
   }
 }
