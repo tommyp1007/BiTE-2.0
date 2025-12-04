@@ -1,0 +1,378 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // Required for SystemNavigator
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../theme/app_colors.dart'; 
+import '../../services/shared_preferences_helper.dart'; 
+import 'play_game_screen.dart';
+import 'game_settings_setup.dart'; 
+import 'word_guess_entry_screen.dart'; 
+// IMPORTANT: Adjust this path to where your HomeScreen is located
+import '../home_screen.dart'; 
+
+class GameLevelScreen extends StatefulWidget {
+  const GameLevelScreen({Key? key}) : super(key: key);
+
+  @override
+  _GameLevelScreenState createState() => _GameLevelScreenState();
+}
+
+class _GameLevelScreenState extends State<GameLevelScreen> {
+  final SharedPreferencesHelper _prefs = SharedPreferencesHelper();
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  String _difficulty = "easy";
+  int _unlockedLevel = 1;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadState();
+  }
+
+  void _loadState() async {
+    String savedDiff = await _prefs.getSavedDifficulty();
+    int unlocked = await _prefs.getUnlockedLevel();
+    
+    if (savedDiff.isEmpty) savedDiff = "easy";
+    
+    if (mounted) {
+      setState(() {
+        _difficulty = savedDiff.toLowerCase();
+        _unlockedLevel = unlocked;
+        _isLoading = false;
+      });
+    }
+  }
+
+  /// Updates difficulty locally and syncs with Firebase
+  void _updateDifficulty(String newDifficulty) async {
+    // 1. Update UI State
+    setState(() {
+      _difficulty = newDifficulty;
+    });
+
+    // 2. Save to SharedPreferences
+    await _prefs.saveDifficulty(newDifficulty);
+
+    // 3. Sync with Firestore
+    User? user = _auth.currentUser;
+    if (user != null) {
+      _db.collection('users').doc(user.uid).update({'difficulty': newDifficulty})
+        .catchError((e) {
+          if (mounted) {
+             ScaffoldMessenger.of(context).showSnackBar(
+               SnackBar(content: Text("Failed to sync difficulty: $e"))
+             );
+          }
+        });
+    }
+  }
+
+  List<int> _getLevelsForDifficulty() {
+    if (_difficulty == 'medium') return [6, 7, 8, 9, 10];
+    if (_difficulty == 'hard') return [11, 12, 13, 14, 15];
+    return [1, 2, 3, 4, 5]; // Default Easy
+  }
+
+  // --- HELPER: Get Color based on difficulty ---
+  Color _getDifficultyColor() {
+    switch (_difficulty) {
+      case 'medium':
+        return Colors.orange; // Orange for Medium
+      case 'hard':
+        return Colors.red;    // Red for Hard
+      default:
+        return Colors.green;  // Green for Easy
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Get the 5 levels for the current mode
+    List<int> levels = _getLevelsForDifficulty();
+
+    return Scaffold(
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFF87CEEB), Color(0xFFADD8E6), Color(0xFFE0F7FA)],
+          ),
+        ),
+        child: SafeArea(
+          child: _isLoading
+              ? const Center(child: CircularProgressIndicator(color: Colors.white))
+              : Column(
+                  children: [
+                    // --- Header ---
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          // --- UPDATED BACK BUTTON ---
+                          GestureDetector(
+                            onTap: () {
+                              // Use pushReplacement to go back to WordGuessEntryScreen
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(builder: (_) => WordGuessEntryScreen()),
+                              );
+                            },
+                            child: Image.asset('assets/images/back_icon.png', width: 40),
+                          ),
+                          
+                          Column(
+                            children: [
+                              const Text(
+                                "SELECT LEVEL",
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.bold,
+                                  shadows: [Shadow(color: Colors.blue, offset: Offset(2, 2), blurRadius: 4)],
+                                ),
+                              ),
+                              // --- UPDATED DIFFICULTY TEXT ---
+                              Text(
+                                "${_difficulty.toUpperCase()} MODE",
+                                style: TextStyle(
+                                  color: _getDifficultyColor(), // Dynamic Color
+                                  fontSize: 24,                 // Increased Font Size (was 16)
+                                  fontWeight: FontWeight.bold,
+                                  shadows: const [
+                                    // Added a white outline shadow to make the color pop against the blue background
+                                    Shadow(color: Colors.white, offset: Offset(0, 1), blurRadius: 1),
+                                    Shadow(color: Colors.black12, offset: Offset(1, 1), blurRadius: 2)
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          
+                          // --- SETTINGS BUTTON ---
+                          IconButton(
+                            icon: const Icon(Icons.settings, color: Colors.white, size: 30),
+                            onPressed: () {
+                               Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (_) => const GameSettingsScreen()),
+                               );
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // --- Custom Level Layout (2-2-1) ---
+                    Expanded(
+                      child: Center(
+                        child: SingleChildScrollView(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              // Row 1: Position 0 and 1
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  _buildLevelButton(levels[0]),
+                                  const SizedBox(width: 40), // Horizontal Gap
+                                  _buildLevelButton(levels[1]),
+                                ],
+                              ),
+                              
+                              const SizedBox(height: 30), // Vertical Gap
+                              
+                              // Row 2: Position 2 and 3
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  _buildLevelButton(levels[2]),
+                                  const SizedBox(width: 40), // Horizontal Gap
+                                  _buildLevelButton(levels[3]),
+                                ],
+                              ),
+
+                              const SizedBox(height: 30), // Vertical Gap
+
+                              // Row 3: Position 4 (Centered)
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  _buildLevelButton(levels[4]),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    // --- Navigation Arrows ---
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 30.0, vertical: 20.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          // Left Arrow (Back)
+                          _buildNavArrow(
+                            Icons.arrow_back, 
+                            _difficulty == 'easy' ? null : () {
+                              if (_difficulty == 'medium') _updateDifficulty('easy');
+                              else if (_difficulty == 'hard') _updateDifficulty('medium');
+                            }
+                          ),
+                          
+                          // Right Arrow (Forward)
+                          _buildNavArrow(
+                            Icons.arrow_forward, 
+                            _difficulty == 'hard' ? null : () {
+                              if (_difficulty == 'easy') _updateDifficulty('medium');
+                              else if (_difficulty == 'medium') _updateDifficulty('hard');
+                            }
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // --- NEW BOTTOM PANEL ---
+                    BottomNavPanel(),
+                  ],
+                ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLevelButton(int level) {
+    bool isLocked = level > _unlockedLevel;
+    
+    return GestureDetector(
+      onTap: () {
+        if (isLocked) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text("Level is locked"),
+            duration: Duration(seconds: 1),
+            backgroundColor: Colors.redAccent,
+          ));
+        } else {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => PlayGameScreen(level: level)),
+          ).then((_) => _loadState());
+        }
+      },
+      // Box Size defined here to ensure they are square
+      child: Container(
+        width: 100, // Fixed width
+        height: 100, // Fixed height
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: isLocked 
+                ? [Colors.grey.shade400, Colors.grey.shade600] 
+                : [const Color(0xFF4A90E2), const Color(0xFF357ABD)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(20), // More rounded corners
+          border: Border.all(color: const Color(0xFF2E6DA4), width: 4),
+          boxShadow: const [BoxShadow(color: Colors.black26, offset: Offset(4, 6), blurRadius: 6)],
+        ),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            if (!isLocked)
+              Positioned(
+                top: 8,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: List.generate(3, (index) => const Icon(Icons.star, color: Colors.amber, size: 16)),
+                ),
+              ),
+            isLocked
+                ? const Icon(Icons.lock, color: Colors.white70, size: 40)
+                : Padding(
+                  padding: const EdgeInsets.only(top: 12.0),
+                  child: Text(
+                      "$level",
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 40,
+                        fontWeight: FontWeight.bold,
+                        shadows: [Shadow(color: Colors.black38, offset: Offset(2, 2), blurRadius: 4)]
+                      ),
+                    ),
+                ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavArrow(IconData icon, VoidCallback? onTap) {
+    bool isDisabled = onTap == null;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: isDisabled ? Colors.grey : Colors.red,
+          shape: BoxShape.circle,
+          boxShadow: const [BoxShadow(color: Colors.black26, offset: Offset(2, 4), blurRadius: 4)],
+        ),
+        child: Icon(icon, color: Colors.white, size: 36),
+      ),
+    );
+  }
+}
+
+// --- NEW BOTTOM PANEL CLASS ---
+class BottomNavPanel extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: AppColors.secondary,
+      padding: EdgeInsets.all(15), 
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // Home Button
+          Expanded(
+            child: GestureDetector(
+              onTap: () => Navigator.pushAndRemoveUntil(
+                context, 
+                MaterialPageRoute(builder: (_) => HomeScreen()), 
+                (r) => false
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Image.asset('assets/images/home_page.png', width: 60, height: 60, fit: BoxFit.scaleDown),
+                  Text("Home", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ),
+          ),
+          
+          // Exit Button
+          Expanded(
+            child: GestureDetector(
+              onTap: () => SystemNavigator.pop(),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Image.asset('assets/images/exit_icon.png', width: 60, height: 60, fit: BoxFit.scaleDown),
+                  Text("Exit", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

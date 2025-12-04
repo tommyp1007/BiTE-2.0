@@ -1,0 +1,9 @@
+<!-- res/drawable/underline.xml -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@android:color/white"/> <!-- Background color of the text box -->
+    <size android:height="2dp"/> <!-- Height of the underline -->
+    <corners android:radius="4dp"/> <!-- Optional: Rounded corners for the background -->
+    <stroke
+        android:color="@android:color/darker_gray"
+        android:width="1dp"/> <!-- Line color and thickness -->
+</shape>

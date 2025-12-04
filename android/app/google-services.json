@@ -1,0 +1,49 @@
+{
+  "project_info": {
+    "project_number": "286483797129",
+    "firebase_url": "https://bite-35e1a-default-rtdb.firebaseio.com",
+    "project_id": "bite-35e1a",
+    "storage_bucket": "bite-35e1a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:286483797129:android:615f79b714293dfcac2258",
+        "android_client_info": {
+          "package_name": "com.bidayuh.bite"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD43b5PBy_jE10hLhYRQI-hNokeFVpOY_4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:286483797129:android:53f1159ef0d90d14ac2258",
+        "android_client_info": {
+          "package_name": "com.example.bite_flutter"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD43b5PBy_jE10hLhYRQI-hNokeFVpOY_4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,53 @@
+workflows:
+  ios-unsigned:
+    name: iOS Unsigned Build
+    max_build_duration: 60
+
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+
+    scripts:
+      # 1️⃣ Install dependencies
+      - name: Install Flutter dependencies
+        script: flutter pub get
+
+      # 2️⃣ Clean old builds
+      - name: Flutter clean
+        script: flutter clean
+
+      # 3️⃣ Fix iOS platform version
+      - name: Ensure iOS minimum version is 13
+        script: |
+          sed -i '' 's/platform :ios.*/platform :ios, '\''13.0'\''/' ios/Podfile
+
+      # 4️⃣ Install CocoaPods
+      - name: Pod install
+        script: |
+          cd ios
+          pod install
+          cd ..
+
+      # 5️⃣ Auto increment build number ONLY
+      - name: Set BUILD NUMBER
+        script: |
+          BUILD_NUMBER=$(($(codemagic_build_number)))
+          echo "Using build number: $BUILD_NUMBER"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" ios/Runner/Info.plist
+
+      # 6️⃣ Build iOS unsigned IPA
+      - name: Build iOS (unsigned)
+        script: |
+          flutter build ipa \
+            --release \
+            --no-codesign
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - build/ios/ipa/*.plist
+
+    publishing:
+      email:
+        recipients:
+          - tommypeyei@gmail.com
