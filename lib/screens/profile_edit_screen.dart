@@ -99,8 +99,8 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
             await user!.updatePassword(newPassword);
             
             // --- AUTOFILL TRIGGER ---
-            // Password Updated - Update Saved Credentials
-            TextInput.finishAutofillContext();
+            // Password Updated - Tell OS to update the saved credential
+            TextInput.finishAutofillContext(shouldSave: true);
             
             await _updateUserProfile(firstName, lastName, username, email, phone);
           } else {
@@ -197,7 +197,9 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
               Expanded(
                 child: SingleChildScrollView(
                   padding: EdgeInsets.symmetric(horizontal: 20),
+                  // AutofillGroup for Edit Profile
                   child: AutofillGroup(
+                    onDisposeAction: AutofillContextAction.commit,
                     child: Column(
                       children: [
                         Image.asset('assets/images/edit_user.png', width: 70, height: 70),
@@ -224,6 +226,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                           onVisibilityToggle: () {
                              setState(() => _isCurrentVisible = !_isCurrentVisible);
                           },
+                          // This is the password for the EXISTING account
                           autofillHints: [AutofillHints.password]
                         ),
                         
@@ -235,6 +238,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                           onVisibilityToggle: () {
                              setState(() => _isNewVisible = !_isNewVisible);
                           },
+                          // This suggests we are setting a NEW password
                           autofillHints: [AutofillHints.newPassword]
                         ),
                         
@@ -283,7 +287,6 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                   ),
                 ),
               ),
-              Container(height: 50, color: AppColors.primaryDark),
             ],
           ),
         ),

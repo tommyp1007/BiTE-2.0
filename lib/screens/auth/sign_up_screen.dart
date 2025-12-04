@@ -72,8 +72,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
         await _saveUserInfo(cred.user!.uid, firstName, lastName, username, phone, email);
         
         // --- AUTOFILL TRIGGER ---
-        // Explicitly tell the OS we finished a sign-up form so it can save the credentials
-        TextInput.finishAutofillContext(); 
+        // Explicitly tell the OS we finished a sign-up form so it can save the NEW credentials
+        TextInput.finishAutofillContext(shouldSave: true); 
         // ------------------------
       }
 
@@ -139,7 +139,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20.0),
+          // AutofillGroup for Sign Up form
           child: AutofillGroup(
+            onDisposeAction: AutofillContextAction.commit,
             child: Column(
               children: [
                 Align(
@@ -164,7 +166,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 _buildInput("Email", _emailCtrl, isEmail: true, autofillHints: [AutofillHints.email]),
                 _buildInput("Phone Number", _phoneCtrl, isPhone: true, autofillHints: [AutofillHints.telephoneNumber]),
                 
-                // We use AutofillHints.password here to aggressively trigger the save prompt
+                // IMPORTANT: Use AutofillHints.newPassword here for sign up
                 _buildInput(
                   "Password", 
                   _passwordCtrl, 
@@ -175,7 +177,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       _isPasswordVisible = !_isPasswordVisible;
                     });
                   },
-                  autofillHints: [AutofillHints.password] 
+                  autofillHints: [AutofillHints.newPassword] 
                 ),
 
                 _buildInput(
@@ -188,6 +190,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       _isConfirmVisible = !_isConfirmVisible;
                     });
                   },
+                  autofillHints: [AutofillHints.newPassword]
                 ),
                 
                 SizedBox(height: 20),
@@ -227,7 +230,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
         obscureText: isPassword ? !isVisible : false,
         autofillHints: autofillHints,
         keyboardType: isEmail ? TextInputType.emailAddress : (isPhone ? TextInputType.phone : TextInputType.text),
-        style: TextStyle(color: AppColors.black),
+        style: TextStyle(color: Colors.black),
         decoration: InputDecoration(
           hintText: hint,
           filled: true,

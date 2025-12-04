@@ -21,7 +21,7 @@ class _SignInScreenState extends State<SignInScreen> {
   bool _isPasswordVisible = false;
 
   Future<void> _signIn() async {
-    // Dismiss keyboard to prepare for state change, but keep context alive for autofill
+    // Dismiss keyboard to commit the text to the controllers
     FocusScope.of(context).unfocus();
 
     String username = _usernameCtrl.text.trim();
@@ -53,8 +53,9 @@ class _SignInScreenState extends State<SignInScreen> {
           );
 
           // --- AUTOFILL TRIGGER ---
-          // Determine that the operation is a success and ask OS to save credentials
-          TextInput.finishAutofillContext(); 
+          // Explicitly tell the OS to save credentials. 
+          // We set shouldSave: true to force the prompt.
+          TextInput.finishAutofillContext(shouldSave: true); 
           // ------------------------
 
           _showToast("Successfully signed in!");
@@ -106,7 +107,9 @@ class _SignInScreenState extends State<SignInScreen> {
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(20.0),
             // AutofillGroup ensures these fields are treated as a single form
+            // onDisposeAction: commit ensures data is saved when screen changes
             child: AutofillGroup(
+              onDisposeAction: AutofillContextAction.commit,
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -135,6 +138,7 @@ class _SignInScreenState extends State<SignInScreen> {
                   _buildInput(
                     "Username", 
                     _usernameCtrl, 
+                    // AutofillHints.username tells the OS this is the key identifier
                     autofillHints: [AutofillHints.username],
                     isLast: false
                   ),
@@ -151,8 +155,9 @@ class _SignInScreenState extends State<SignInScreen> {
                         _isPasswordVisible = !_isPasswordVisible;
                       });
                     },
+                    // AutofillHints.password tells the OS this is the secret to save
                     autofillHints: [AutofillHints.password],
-                    isLast: true // Allows "Done" on keyboard to trigger login
+                    isLast: true 
                   ),
                   
                   SizedBox(height: 20),
@@ -204,8 +209,8 @@ class _SignInScreenState extends State<SignInScreen> {
       obscureText: isPassword ? !isVisible : false,
       autofillHints: autofillHints, 
       textInputAction: isLast ? TextInputAction.done : TextInputAction.next,
-      onEditingComplete: isLast ? _signIn : null, // Helper: Enter key triggers login
-      style: TextStyle(color: AppColors.black),
+      onEditingComplete: isLast ? _signIn : null, 
+      style: TextStyle(color: Colors.black), // Changed to black for better visibility on white bg
       decoration: InputDecoration(
         hintText: hint,
         filled: true,
