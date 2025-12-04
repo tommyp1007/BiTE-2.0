@@ -121,57 +121,42 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
     String result = "";
 
     // ==========================================
-    // STRATEGY: DUAL PIVOT SYSTEM
+    // STRATEGY: SMART PIVOT TRANSLATION
     // ==========================================
 
-    // 1. BIDAYUH -> ENGLISH (Uses Malay Pivot)
-    // Structure of Bidayuh is closer to Malay. converting Bidayuh->Malay first is safer, 
-    // then letting Google handle Malay->English grammar.
+    // 1. BIDAYUH -> ENGLISH (Pivot via Malay DB)
+    // Bidayuh (DB) -> Rough Malay (DB) -> English (API)
     if (_fromLanguage == "Bidayuh" && _toLanguage == "English") {
-      // Step A: Get Rough Malay from DB
+      String roughMalay = _getBidayuhTranslation(text, "bidayuh", "malay");
+      if (roughMalay == "Translation is soon to add") {
+        result = roughMalay;
+      } else {
+        result = await _translationService.translate(roughMalay, "Malay", "English");
+      }
+    }
+    
+    // 2. BIDAYUH -> MALAY (Double Pivot: DB Malay -> API English -> API Malay)
+    // This ensures vocab comes from DB ("Akuk"->"Saya") but grammar comes from API re-structuring.
+    else if (_fromLanguage == "Bidayuh" && _toLanguage == "Malay") {
+      // Step A: Get correct words from DB (Rough Malay)
       String roughMalay = _getBidayuhTranslation(text, "bidayuh", "malay");
       
       if (roughMalay == "Translation is soon to add") {
         result = roughMalay;
       } else {
-        // Step B: Send Rough Malay to API -> English
-        result = await _translationService.translate(roughMalay, "Malay", "English");
-      }
-    }
-    
-    // 2. BIDAYUH -> MALAY (Uses English Pivot for Sentences)
-    // Direct word mapping is used for single words.
-    // For sentences, Bidayuh->English->Malay ensures formal grammar structure.
-    else if (_fromLanguage == "Bidayuh" && _toLanguage == "Malay") {
-      // Check word count (excluding punctuation)
-      int wordCount = text.replaceAll(RegExp(r'[^\w\s]'), '').trim().split(RegExp(r'\s+')).length;
-
-      // SINGLE WORD: Use Direct Database (Accurate Vocab)
-      // e.g. "Akuk" -> "Saya"
-      if (wordCount <= 1) {
-        result = _getBidayuhTranslation(text, "bidayuh", "malay");
-      } 
-      // SENTENCE: Use English Pivot (Better Grammar)
-      // e.g. "Ani ndai" -> "What doing" -> "Apa yang awak buat"
-      else {
-        String roughEnglish = _getBidayuhTranslation(text, "bidayuh", "english");
+        // Step B: Send to English API to fix structure (e.g. "Minum racun saya" -> "I drink poison")
+        String tempEnglish = await _translationService.translate(roughMalay, "Malay", "English");
         
-        if (roughEnglish == "Translation is soon to add") {
-          // If English mapping missing, fallback to direct Malay DB
-          result = _getBidayuhTranslation(text, "bidayuh", "malay");
+        if (tempEnglish == "Translation is soon to add") {
+           result = roughMalay; // Fallback
         } else {
-          // Send Rough English to API -> Malay
-          result = await _translationService.translate(roughEnglish, "English", "Malay");
-          
-          // Safety net: If API fails, fall back to direct DB
-          if (result == "Translation is soon to add") {
-             result = _getBidayuhTranslation(text, "bidayuh", "malay");
-          }
+           // Step C: Send back to Malay API (e.g. "I drink poison" -> "Saya minum racun")
+           result = await _translationService.translate(tempEnglish, "English", "Malay");
         }
       }
     }
 
-    // 3. ENGLISH -> BIDAYUH (Uses Malay Pivot)
+    // 3. ENGLISH -> BIDAYUH (Pivot via Malay)
     // English -> Malay (API) -> Bidayuh (DB)
     else if (_fromLanguage == "English" && _toLanguage == "Bidayuh") {
       String properMalay = await _translationService.translate(text, "English", "Malay");

@@ -225,13 +225,33 @@ class _PlayGameScreenState extends State<PlayGameScreen> with WidgetsBindingObse
     _playSound('pop');
   }
 
+  // --- BACKSPACE LOGIC ---
+  
+  // Single Tap: Deletes one character
   void _onBackspace() {
     if (_isGameFinished && _isSuccess) return; 
     
-    _triggerVibration(); // Vibration on backspace
+    _triggerVibration(); 
     if (_selectedLetters.isNotEmpty) {
       setState(() {
         _selectedLetters.removeLast();
+        if (_isGameFinished && !_isSuccess) {
+           _isGameFinished = false;
+           _isSuccess = false;
+        }
+      });
+      _playSound('backspace');
+    }
+  }
+
+  // Long Press: Clears ALL characters
+  void _onClearAll() {
+    if (_isGameFinished && _isSuccess) return;
+
+    _triggerVibration();
+    if (_selectedLetters.isNotEmpty) {
+      setState(() {
+        _selectedLetters.clear();
         if (_isGameFinished && !_isSuccess) {
            _isGameFinished = false;
            _isSuccess = false;
@@ -560,9 +580,10 @@ class _PlayGameScreenState extends State<PlayGameScreen> with WidgetsBindingObse
                           ),
                           SizedBox(width: 10),
                           
-                          // Backspace Button
+                          // --- UPDATED BACKSPACE BUTTON ---
                           GestureDetector(
-                            onTap: _onBackspace,
+                            onTap: _onBackspace,     // Tap to delete one
+                            onLongPress: _onClearAll, // Long press to delete all
                             child: Container(
                               padding: EdgeInsets.all(12),
                               decoration: BoxDecoration(
