@@ -5,46 +5,36 @@ workflows:
     max_build_duration: 60
     environment:
       flutter: stable
-      xcode: latest # Uses the latest Xcode to ensure iOS 15+ SDK support
+      xcode: latest
       cocoapods: default
     scripts:
       - name: Clean up and Setup
         script: |
-          # 1. Clean build cache
+          # 1. Clean Flutter
           flutter clean
           
-          # 2. IMPORTANT: Remove the local Podfile.lock. 
-          # This forces CocoaPods to resolve dependencies again using your new 'platform :ios, 15.0' setting.
+          # 2. Delete old iOS dependency locks to force an update to iOS 15.5
           rm -f ios/Podfile.lock
           
-          # 3. Get packages
+          # 3. Get Flutter packages
           flutter pub get
 
-      - name: Install Pods
+      - name: Install Pods with Repo Update
         script: |
-          # Install pods and update the repo to get the latest Firebase versions
+          # We run repo-update to ensure we get the latest Firebase specs
           find . -name "Podfile" -execdir pod install --repo-update \;
 
       - name: Build iOS without signing
         script: |
-          # Build the .app bundle in release mode without code signing capabilities
+          # Build the .app bundle in release mode without code signing
           flutter build ios --release --no-codesign
 
       - name: Package .app into unsigned .ipa
         script: |
-          # Go to the build output directory
           cd build/ios/iphoneos
-          
-          # 1. Create a directory named 'Payload' (Required for IPA structure)
           mkdir Payload
-          
-          # 2. Move the built App into the Payload folder
           mv Runner.app Payload/
-          
-          # 3. Zip the Payload folder into a file named 'ios_unsigned.ipa'
           zip -r ios_unsigned.ipa Payload
-          
-          # 4. Move the resulting IPA to the export directory so you can download it
           mv ios_unsigned.ipa $CM_EXPORT_DIR/ios_unsigned.ipa
 
     artifacts:
@@ -53,4 +43,4 @@ workflows:
     publishing:
       email:
         recipients:
-          - tommypeyei@gmail.com # Change this to your email address!
+          - tommypeyei@gmail.com
