@@ -4,7 +4,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:http/http.dart' as http;
 
 class TranslationService {
-  static const String _apiKey = "AIzaSyBJEZs_TIsG1SzlJcuk48qiblqJYNAuvrY";
+  static const String _apiKey = "AIzaSyBJEZs_TIsG1SzlJcuk48qiblqJYNAuvrY"; // Note: Secure this in production
   static const String _baseUrl = "https://translation.googleapis.com/language/translate/v2";
 
   final OnDeviceTranslator _englishToMalay;
@@ -21,7 +21,6 @@ class TranslationService {
   Future<String> translate(String text, String fromLang, String toLang) async {
     if (text.isEmpty) return "";
     
-    // Normalize logic
     String cleanFrom = fromLang.toLowerCase();
     String cleanTo = toLang.toLowerCase();
 
@@ -39,15 +38,11 @@ class TranslationService {
     }
 
     // --- FALLBACK LOGIC ---
-    // If API returns identical string (ignoring case), it likely failed.
-    // However, if the text contains symbols that don't change (e.g., "?", "!"), we shouldn't error.
-    // We check if at least one alphanumeric character changed, or if the input was meaningless.
-    
-    String rawInput = text.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toLowerCase();
-    String rawOutput = result.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toLowerCase();
-
-    // If input had words but output is identical, assume failure
-    if (rawInput.isNotEmpty && rawInput == rawOutput) {
+    // If we are online, we TRUST the API output, even if it's identical.
+    // Example: "Hello" (En) -> "Hello" (Ms) is valid.
+    // Only return the "soon to add" error if the result is empty or specifically indicates failure.
+    // However, if we want to be safe, we only check if the API returns NO content.
+    if (result.trim().isEmpty) {
       return "Translation is soon to add";
     }
 
@@ -78,18 +73,18 @@ class TranslationService {
             data['data']['translations'] != null &&
             data['data']['translations'].isNotEmpty) {
           
-          // Google API handles punctuation well, but sometimes returns encoded HTML like &#39;
           String raw = data['data']['translations'][0]['translatedText'];
           return _unescapeHtml(raw);
         }
       }
-      return text; // Return original on failure
+      // If API fails, we return the input text so it just shows up 
+      // (Better than crashing, user will see untranslated text)
+      return text; 
     } catch (e) {
       return text;
     }
   }
 
-  // Simple unescape for common HTML entities returned by Google
   String _unescapeHtml(String input) {
     return input
       .replaceAll("&quot;", "\"")

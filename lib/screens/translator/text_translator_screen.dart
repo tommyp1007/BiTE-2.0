@@ -106,7 +106,7 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
   }
 
   void _handleTranslate() async {
-    String text = _sourceController.text.trim(); // Keep original casing/punctuation for split
+    String text = _sourceController.text.trim(); // Preserve punctuation
     
     if (text.isEmpty) {
       if (mounted) setState(() { _translatedText = ""; _isResultVisible = false; });
@@ -120,16 +120,12 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
 
     String result = "";
 
-    // --- PIVOT STRATEGY (Bidayuh <-> API) ---
-
     // 1. BIDAYUH -> ENGLISH (Pivot via Malay)
     if (_fromLanguage == "Bidayuh" && _toLanguage == "English") {
-      // Get Rough Malay from DB (Preserving Punctuation)
       String roughMalay = _getBidayuhTranslation(text, "bidayuh", "malay");
       if (roughMalay == "Translation is soon to add") {
         result = roughMalay;
       } else {
-        // Send to API to fix grammar and translate to English
         result = await _translationService.translate(roughMalay, "Malay", "English");
       }
     }
@@ -137,6 +133,7 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
     // 2. ENGLISH -> BIDAYUH (Pivot via Malay)
     else if (_fromLanguage == "English" && _toLanguage == "Bidayuh") {
       String properMalay = await _translationService.translate(text, "English", "Malay");
+      // Check strict failure for API
       if (properMalay == "Translation is soon to add") {
         result = properMalay;
       } else {
@@ -170,9 +167,7 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
   String _getBidayuhTranslation(String text, String fromLang, String toLang) {
     if (text.trim().isEmpty) return "";
 
-    // 1. Pre-process: Insert spaces around punctuation so they become separate tokens
-    // Matches any character that is NOT a word char, whitespace, or digit
-    // Example: "Ani, ndai?" -> "Ani , ndai ?"
+    // Separate punctuation
     String spacedText = text.replaceAllMapped(RegExp(r'([^\w\s]|_)'), (match) {
       return ' ${match.group(0)} ';
     });
@@ -186,21 +181,18 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
     while (words.isNotEmpty) {
       String? phrase;
       String singleWord = words[0];
-      // Lookup version is always lowercase
       String lookupKey = singleWord.toLowerCase();
       int wordsUsed = 0;
 
-      // 2. Check if token is just punctuation/symbol
-      // If it matches punctuation regex, we just keep it.
+      // Keep punctuation as is
       if (RegExp(r'^[^\w\s]+$').hasMatch(singleWord)) {
         translatedParts.add(singleWord);
         words.removeAt(0);
         continue;
       }
 
-      // 3. Greedy Phrase Search
+      // Greedy Phrase Search
       for (int i = words.length; i > 0; i--) {
-        // Create phrase key from first 'i' words
         String potentialPhrase = words.sublist(0, i).join(" ").toLowerCase();
 
         if (fromLang == 'bidayuh' && toLang == 'english') {
@@ -222,7 +214,7 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
         }
       }
 
-      // 4. Single word fallback
+      // Single word fallback
       if (phrase == null) {
         if (fromLang == 'bidayuh' && toLang == 'english') phrase = _bidayuhToEnglishDict[lookupKey];
         else if (fromLang == 'bidayuh' && toLang == 'malay') phrase = _bidayuhToMalayDict[lookupKey];
@@ -231,11 +223,9 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
         wordsUsed = 1;
       }
 
-      // 5. Result handling
       if (phrase != null) {
         translatedParts.add(phrase);
       } else {
-        // If it's a WORD (not punctuation) and missing, trigger fallback
         hasMissingTranslation = true;
         break; 
       }
@@ -249,15 +239,11 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
       return "Translation is soon to add";
     }
 
-    // 6. Post-process: Join and clean up spaces before punctuation
-    // Join with spaces -> "What do you do ?"
+    // Clean up spaces before punctuation
     String rawResult = translatedParts.join(" ");
-    // Remove space before punctuation: " ?" -> "?"
-    String cleanedResult = rawResult.replaceAllMapped(RegExp(r'\s+([^\w\s])'), (match) {
+    return rawResult.replaceAllMapped(RegExp(r'\s+([^\w\s])'), (match) {
       return match.group(1)!;
     });
-
-    return cleanedResult;
   }
 
   void _swapLanguages() {
@@ -271,7 +257,9 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Detect keyboard state
     final double keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
+    final bool isKeyboardOpen = keyboardHeight > 0;
 
     return Scaffold(
       backgroundColor: AppColors.primary,
@@ -287,6 +275,7 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
               Expanded(
                 child: Stack(
                   children: [
+                    // Main Content
                     Container(
                       margin: EdgeInsets.only(top: 10),
                       padding: EdgeInsets.only(bottom: 70),
@@ -349,6 +338,8 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
                         ],
                       ),
                     ),
+                    
+                    // Floating Language Bar
                     Positioned(
                       left: 0,
                       right: 0,
@@ -370,14 +361,32 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
                                 setState(() => _fromLanguage = val);
                                 if (_sourceController.text.isNotEmpty) _handleTranslate();
                               }),
+                              
                               IconButton(
                                 icon: Icon(Icons.swap_horiz, color: AppColors.primary, size: 28),
                                 onPressed: _swapLanguages,
                               ),
+                              
                               _buildLanguageButton(_toLanguage, (val) {
                                 setState(() => _toLanguage = val);
                                 if (_sourceController.text.isNotEmpty) _handleTranslate();
                               }),
+
+                              // --- HIDE KEYBOARD BUTTON ---
+                              // Only visible when keyboard is open
+                              if (isKeyboardOpen)
+                                Container(
+                                  margin: EdgeInsets.only(left: 8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade200,
+                                    shape: BoxShape.circle
+                                  ),
+                                  child: IconButton(
+                                    icon: Icon(Icons.keyboard_hide, color: Colors.black54),
+                                    onPressed: () => FocusScope.of(context).unfocus(),
+                                    tooltip: "Hide Keyboard",
+                                  ),
+                                )
                             ],
                           ),
                         ),
