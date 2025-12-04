@@ -80,7 +80,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
               children: [
                 // Your Logo
                 Image.asset(
-                  'assets/images/bite_icon2_bright.png',
+                  'assets/images/bite_icon.png',
                   width: 150,
                   height: 150,
                   // Handle error if image is missing so app doesn't crash

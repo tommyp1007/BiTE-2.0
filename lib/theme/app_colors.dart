@@ -6,9 +6,9 @@ class AppColors {
   // Matches @color/colorPrimaryDark
   static const Color primaryDark = Color(0xFF1B5E20); 
   // Matches @color/colorSecondary (Orange)
-  static const Color secondary = Color(0xFFFF9800); 
+  static const Color secondary = Color(0xFF623215);
   // Matches @color/colorAccent
-  static const Color accent = Color(0xFFFF4081);
+  static const Color accent = Color(0xFFae551d);
   
   static const Color white = Colors.white;
   static const Color black = Colors.black;

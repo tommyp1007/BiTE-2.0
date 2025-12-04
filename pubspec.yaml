@@ -71,9 +71,15 @@ flutter:
 # We do NOT put the image here because we want the Flutter code 
 # to handle the "Fade In" animation manually.
 flutter_native_splash:
-  color: "#2E7D32" # Matches AppColors.primary
-  # image: assets/images/bite_icon2_bright.png # Commented out to allow fade-in effect
+  color: "#2E7D32" 
+  # Use the new PADDED image
+  image: assets/images/bite_icon.png 
   android_12:
     color: "#2E7D32"
-    # image: assets/images/bite_icon2_bright.png # Commented out
+    # Use the new PADDED image here too
+    image: assets/images/bite_icon.png
+    
+    # Crucial setting: This tells Android NOT to zoom in too much
+    icon_background_color: "#2E7D32" 
+    
   web: false

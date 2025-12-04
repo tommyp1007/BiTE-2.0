@@ -151,7 +151,7 @@ class _SignInScreenState extends State<SignInScreen> {
                   ElevatedButton(
                     onPressed: _signIn,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.accent, // Corresponds to your XML tint
+                      backgroundColor: Color(0xFFFF914D), // Corresponds to your XML tint
                       minimumSize: Size(double.infinity, 50)
                     ),
                     child: Text("Sign In", style: TextStyle(fontSize: 18, color: AppColors.white)),
@@ -163,7 +163,7 @@ class _SignInScreenState extends State<SignInScreen> {
                   ElevatedButton(
                     onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SignUpScreen())),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.secondary, // Corresponds to your XML tint
+                      backgroundColor: Color(0xFF623215), // Corresponds to your XML tint
                       minimumSize: Size(double.infinity, 50)
                     ),
                     child: Text("Sign Up", style: TextStyle(fontSize: 18, color: AppColors.white)),
