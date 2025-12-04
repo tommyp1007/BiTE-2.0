@@ -52,7 +52,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _checkUserStatus() {
     currentUser = _auth.currentUser;
-    setState(() => isInGuestMode = currentUser == null);
+    setState(() => isInGuestMode = (currentUser == null));
 
     if (!isInGuestMode) {
       _loadGameStateFromFirestore(currentUser!.uid);
@@ -115,14 +115,13 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       backgroundColor: AppColors.primary,
 
-      // only Android shows bottom navbar
       bottomNavigationBar: isiOS ? null : BottomNavPanel(),
 
       body: SafeArea(
         bottom: false,
         child: Column(
           children: [
-            // Header remains same
+            // ------------------- TOP HEADER -------------------
             Container(
               padding: EdgeInsets.all(10),
               child: Row(
@@ -149,36 +148,55 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
 
-            GestureDetector(
-              onTap: () {
-                if (isInGuestMode) _promptSignIn();
-                else Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileEditScreen()));
-              },
-              child: Image.asset('assets/images/user_icon.png', width: 40, height: 40),
-            ),
+            SizedBox(height: 15),
 
-            SizedBox(height: 8),
+            // ------------------- CENTER USER ICON + WELCOME TEXT -------------------
+            Center(
+              child: Column(
+                children: [
+                  GestureDetector(
+                    onTap: () {
+                      if (isInGuestMode) _promptSignIn();
+                      else {
+                        Navigator.push(context,
+                          MaterialPageRoute(builder: (_) => ProfileEditScreen()));
+                      }
+                    },
+                    child: Image.asset('assets/images/user_icon.png',
+                        width: 65, height: 65),
+                  ),
 
-            GestureDetector(
-              onTap: () {
-                if (isInGuestMode) _promptSignIn();
-                else Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileEditScreen()));
-              },
-              child: Text(
-                welcomeText,
-                style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                  SizedBox(height: 10),
+
+                  GestureDetector(
+                    onTap: () {
+                      if (isInGuestMode) _promptSignIn();
+                      else {
+                        Navigator.push(context,
+                          MaterialPageRoute(builder: (_) => ProfileEditScreen()));
+                      }
+                    },
+                    child: Text(
+                      welcomeText,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
 
-            SizedBox(height: 10),
+            SizedBox(height: 20),
 
-            // -------- CENTERED GRID FOR BOTH iOS & ANDROID ----------
+            // ------------------- GRID (CENTERED FOR iOS / ANDROID) -------------------
             Expanded(
               child: Center(
                 child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxWidth: 500,  // keeps layout centered even on iPad / large screens
-                  ),
+                  constraints: BoxConstraints(maxWidth: 500),
                   child: GridView.builder(
                     padding: EdgeInsets.all(16),
                     shrinkWrap: true,
@@ -194,8 +212,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       final item = _gridItems[index];
                       return Card(
                         color: AppColors.secondary,
-                        shape:
-                            RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                         child: InkWell(
                           onTap: () => _handleGridClick(item['title'], item['page']),
                           child: Column(
@@ -205,17 +224,16 @@ class _HomeScreenState extends State<HomeScreen> {
                                 'assets/images/${item['img']}',
                                 width: 60,
                                 height: 60,
-                                errorBuilder: (_, __, ___) =>
-                                    Icon(Icons.image, size: 50, color: Colors.white),
                               ),
                               SizedBox(height: 12),
                               Text(
                                 item['title'],
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.bold),
+                                  color: Colors.white,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ],
                           ),
@@ -227,6 +245,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
 
+            // ------------------- BOTTOM TRADEMARK -------------------
             Padding(
               padding: EdgeInsets.only(bottom: isiOS ? 16 : 8),
               child: Text(
