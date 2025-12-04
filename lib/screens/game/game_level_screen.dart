@@ -6,7 +6,6 @@ import '../../services/shared_preferences_helper.dart';
 import 'play_game_screen.dart';
 import 'game_settings_setup.dart'; 
 import 'word_guess_entry_screen.dart'; 
-
 import '../../widgets/common_layouts.dart'; 
 
 class GameLevelScreen extends StatefulWidget {
@@ -149,10 +148,11 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
                           IconButton(
                             icon: const Icon(Icons.settings, color: Colors.white, size: 30),
                             onPressed: () {
+                               // Push to settings, then RELOAD state when returning
                                Navigator.push(
                                   context,
                                   MaterialPageRoute(builder: (_) => const GameSettingsScreen()),
-                               );
+                               ).then((_) => _loadState()); // <--- CRITICAL for refreshing locks
                             },
                           ),
                         ],
@@ -166,7 +166,6 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              // Row 1: Position 0 and 1
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
@@ -175,10 +174,7 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
                                   _buildLevelButton(levels[1]),
                                 ],
                               ),
-                              
                               const SizedBox(height: 30), 
-                              
-                              // Row 2: Position 2 and 3
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
@@ -187,10 +183,7 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
                                   _buildLevelButton(levels[3]),
                                 ],
                               ),
-
                               const SizedBox(height: 30), 
-
-                              // Row 3: Position 4 (Centered)
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
@@ -209,7 +202,6 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          // Left Arrow (Back)
                           _buildNavArrow(
                             Icons.arrow_back, 
                             _difficulty == 'easy' ? null : () {
@@ -217,8 +209,6 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
                               else if (_difficulty == 'hard') _updateDifficulty('medium');
                             }
                           ),
-                          
-                          // Right Arrow (Forward)
                           _buildNavArrow(
                             Icons.arrow_forward, 
                             _difficulty == 'hard' ? null : () {

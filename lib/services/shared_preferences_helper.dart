@@ -27,6 +27,7 @@ class SharedPreferencesHelper {
     return prefs.getString(_keyDifficulty) ?? "easy";
   }
 
+  // Used by the Reset Button to lock levels back to 1
   Future<void> setUnlockedLevel(int level) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_keyUnlockedLevel, level);
