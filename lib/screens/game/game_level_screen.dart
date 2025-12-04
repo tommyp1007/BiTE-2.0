@@ -24,7 +24,7 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
   int _unlockedLevel = 1;
   bool _isLoading = true;
   
-  // --- NEW: Map to store stars for each level ---
+  // Map to store stars for each level
   Map<int, int> _levelStars = {}; 
 
   @override
@@ -37,7 +37,7 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
     String savedDiff = await _prefs.getSavedDifficulty();
     int unlocked = await _prefs.getUnlockedLevel();
     
-    // --- NEW: Load Stars for all levels ---
+    // Load Stars for all levels
     Map<int, int> loadedStars = {};
     for (int i = 1; i <= 15; i++) {
       int stars = await _prefs.getStarsForLevel(i);
@@ -241,6 +241,9 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
     // Get stars for this level (0 if not played/passed)
     int starCount = _levelStars[level] ?? 0;
     
+    // Check if we actually have stars to display
+    bool hasStars = !isLocked && starCount > 0;
+    
     return GestureDetector(
       onTap: () {
         if (isLocked) {
@@ -274,37 +277,39 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
         child: Stack(
           alignment: Alignment.center,
           children: [
-            // --- UPDATED: BIG STARS AT TOP ---
-            if (!isLocked && starCount > 0)
+            // --- STARS (Only if unlocked and played) ---
+            if (hasStars)
               Positioned(
-                top: 5,
+                top: 8,
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: List.generate(3, (index) {
-                    // Only show filled stars if index < starCount
                     return Icon(
                       index < starCount ? Icons.star : Icons.star_border, 
                       color: index < starCount ? Colors.amber : Colors.white30, 
-                      size: 22, // Bigger stars
+                      size: 20, 
                     );
                   }),
                 ),
               ),
               
+            // --- MAIN ICON / NUMBER ---
             isLocked
                 ? const Icon(Icons.lock, color: Colors.white70, size: 40)
                 : Padding(
-                  padding: const EdgeInsets.only(top: 15.0), // Pushed down slightly to make room for stars
-                  child: Text(
-                      "$level",
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 40,
-                        fontWeight: FontWeight.bold,
-                        shadows: [Shadow(color: Colors.black38, offset: Offset(2, 2), blurRadius: 4)]
+                    // IF we have stars -> Add padding to push number down.
+                    // IF NO stars -> Padding is 0, keeping it perfectly centered.
+                    padding: EdgeInsets.only(top: hasStars ? 22.0 : 0.0), 
+                    child: Text(
+                        "$level",
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 40,
+                          fontWeight: FontWeight.bold,
+                          shadows: [Shadow(color: Colors.black38, offset: Offset(2, 2), blurRadius: 4)]
+                        ),
                       ),
-                    ),
-                ),
+                  ),
           ],
         ),
       ),
