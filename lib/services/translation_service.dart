@@ -4,11 +4,9 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:http/http.dart' as http;
 
 class TranslationService {
-  // Note: Secure your API Key for production
-  static const String _apiKey = "AIzaSyBJEZs_TIsG1SzlJcuk48qiblqJYNAuvrY";
+  static const String _apiKey = "AIzaSyBJEZs_TIsG1SzlJcuk48qiblqJYNAuvrY"; // Caution with API Keys in prod
   static const String _baseUrl = "https://translation.googleapis.com/language/translate/v2";
 
-  // ML Kit Translators
   final OnDeviceTranslator _englishToMalay;
   final OnDeviceTranslator _malayToEnglish;
 
@@ -21,28 +19,30 @@ class TranslationService {
             targetLanguage: TranslateLanguage.english);
 
   Future<String> translate(String text, String fromLang, String toLang) async {
-    if (text.isEmpty) return "Text cannot be empty";
-    if (fromLang.toLowerCase() == toLang.toLowerCase()) return "Unsupported Translation Pair.";
+    if (text.isEmpty) return "";
+    
+    // Normalize logic
+    String cleanFrom = fromLang.toLowerCase();
+    String cleanTo = toLang.toLowerCase();
+
+    if (cleanFrom == cleanTo) return "Unsupported Translation Pair.";
 
     bool hasInternet = await _isNetworkAvailable();
-
     String result;
+
     if (hasInternet) {
       String targetCode = _getLanguageCode(toLang);
       String sourceCode = _getLanguageCode(fromLang);
       result = await _translateOnline(text, sourceCode, targetCode);
     } else {
-      result = await _translateOffline(text, fromLang, toLang);
+      result = await _translateOffline(text, cleanFrom, cleanTo);
     }
 
-    // --- NEW FALLBACK LOGIC ---
-    // If the API returns the exact same string (case-insensitive), it likely means
-    // it couldn't find a translation (common for names or unknown words).
-    // If it's a SINGLE WORD, return your specific message.
-    bool isSingleWord = text.trim().split(RegExp(r'\s+')).length == 1;
-    
-    // We compare lowercase trimmed versions to detect "not translated" scenarios
-    if (result.trim().toLowerCase() == text.trim().toLowerCase() && isSingleWord) {
+    // --- FALLBACK LOGIC ---
+    // If the API output is identical to input (ignoring case/spacing), 
+    // it likely failed to translate or found no match.
+    // Return "Translation is soon to add" to trigger the UI check.
+    if (result.trim().toLowerCase() == text.trim().toLowerCase()) {
       return "Translation is soon to add";
     }
 
@@ -52,7 +52,8 @@ class TranslationService {
   String _getLanguageCode(String language) {
     if (language.toLowerCase() == 'english') return 'en';
     if (language.toLowerCase() == 'malay') return 'ms';
-    return 'en';
+    // Bidayuh code doesn't exist in Google API, but this function is only called for API supported langs
+    return 'en'; 
   }
 
   Future<bool> _isNetworkAvailable() async {
@@ -75,25 +76,23 @@ class TranslationService {
           return data['data']['translations'][0]['translatedText'];
         }
       }
-      return "Error: ${response.statusCode}";
+      // If API fails, return original text so fallback logic triggers
+      return text; 
     } catch (e) {
-      return "Network error: $e";
+      return text; // Return text on network error to allow fallback check
     }
   }
 
   Future<String> _translateOffline(String text, String fromLang, String toLang) async {
-    fromLang = fromLang.toLowerCase();
-    toLang = toLang.toLowerCase();
-
     try {
       if (fromLang == 'english' && toLang == 'malay') {
         return await _englishToMalay.translateText(text);
       } else if (fromLang == 'malay' && toLang == 'english') {
         return await _malayToEnglish.translateText(text);
       }
-      return "Offline model not found for this pair.";
+      return text; // Return original on missing model
     } catch (e) {
-      return "Translation failed: $e";
+      return text;
     }
   }
 
