@@ -4,7 +4,6 @@ plugins {
     id("com.google.gms.google-services")
     // END: FlutterFire Configuration
     id("kotlin-android")
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
 
@@ -16,17 +15,11 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-        // Suppress warnings from third-party libraries
-        allWarningsAsErrors = false
     }
 
     kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_17.toString()
-        // Show deprecation and unchecked warnings, but don't fail build
-        freeCompilerArgs += listOf(
-            "-Xlint:deprecation",
-            "-Xlint:unchecked"
-        )
+        // Updated to use the simple string format "17" to fix the toString() deprecation issue
+        jvmTarget = "17" 
     }
 
     defaultConfig {
