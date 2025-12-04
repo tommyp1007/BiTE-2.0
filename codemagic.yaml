@@ -16,17 +16,24 @@ workflows:
         script: |
           find . -name "Podfile" -execdir pod install \;
 
-      - name: Build iOS .app bundle (No Code Signing)
+      - name: Build and Package IPA
         script: |
-          # Build unsigned iOS app for generic device (iPhone & iPad)
-          flutter build ios --no-codesign
-          
-      - name: Create IPA from .app
-        script: |
+          # 1. Build the .app bundle (unsigned)
+          flutter build ios --release --no-codesign
+
+          # 2. Navigate to the build directory
           cd build/ios/iphoneos
+
+          # 3. Create the Payload folder structure required by Apple
           mkdir Payload
           mv Runner.app Payload/
-          zip -r bite_app_unsigned.ipa Payload
-          
+
+          # 4. Zip the Payload folder into a .ipa file
+          # The -y flag preserves symbolic links (crucial for iOS apps)
+          zip -r -y bite_flutter.ipa Payload/
+
+          # 5. Move the finished .ipa to the export directory
+          mv bite_flutter.ipa $CM_EXPORT_DIR/bite_flutter.ipa
+
     artifacts:
-      - build/ios/iphoneos/bite_app_unsigned.ipa
+      - bite_flutter.ipa # This ensures you download the .ipa file directly
