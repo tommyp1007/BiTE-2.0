@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // Import needed for settings
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'firebase_options.dart'; 
 import 'theme/app_colors.dart';
@@ -15,6 +16,13 @@ void main() async {
   // 3. Initialize Firebase
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  // ⭐ NEW: Enable Offline Persistence & Sync
+  // This allows the app to work offline and sync data when online automatically.
+  FirebaseFirestore.instance.settings = const Settings(
+    persistenceEnabled: true, 
+    cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
   );
 
   // 4. Run App

@@ -15,6 +15,8 @@ class GameDataManager {
   }
 
   // Save game state
+  // ⭐ NOTE: Because we enabled persistence in main.dart, 
+  // this function works OFFLINE. Data is cached and syncs when online.
   Future<void> saveGameState(int level, int score, String difficulty, int unlockedLevel) async {
     User? user = _auth.currentUser;
     if (user != null) {

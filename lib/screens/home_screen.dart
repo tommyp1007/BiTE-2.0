@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:permission_handler/permission_handler.dart'; 
+import 'package:device_info_plus/device_info_plus.dart'; // Optional: helps checking android version, but we can do it with logic below
 
 import '../../theme/app_colors.dart';
 import '../../services/shared_preferences_helper.dart';
@@ -43,23 +44,41 @@ class _HomeScreenState extends State<HomeScreen> {
     _requestInitialPermissions();
   }
 
-  // ⭐ UPDATED: Requests ALL permissions in Manifest
+  // ⭐ UPDATED: Robust Permission Request
   Future<void> _requestInitialPermissions() async {
-    // We request specific media permissions for Android 13+ and generic storage for older versions
-    // We also include Location, Microphone, and Notifications
-    Map<Permission, PermissionStatus> statuses = await [
+    List<Permission> permissionsToRequest = [
       Permission.microphone,
-      Permission.location,     // Matches ACCESS_FINE_LOCATION
-      Permission.notification, // Matches POST_NOTIFICATIONS
-      
-      // Storage permissions (Handles both Android 12 and Android 13+)
-      Permission.storage, 
-      Permission.photos,
-      Permission.videos,
-      Permission.audio,
-    ].request();
+      Permission.location,     
+      Permission.notification, 
+    ];
 
-    // Optional: You can check 'statuses' here if you want to show a message if denied
+    if (Platform.isAndroid) {
+      // Logic for Android 13+ vs Older Androids
+      final androidInfo = await DeviceInfoPlugin().androidInfo;
+      
+      if (androidInfo.version.sdkInt >= 33) {
+        // Android 13+ uses granular permissions
+        permissionsToRequest.addAll([
+          Permission.photos,
+          Permission.videos,
+          Permission.audio,
+        ]);
+      } else {
+        // Android 12 and below uses standard storage permission
+        permissionsToRequest.add(Permission.storage);
+      }
+    } else {
+      // iOS
+      permissionsToRequest.addAll([
+        Permission.storage, 
+        Permission.photos
+      ]);
+    }
+
+    // Request all accumulated permissions
+    Map<Permission, PermissionStatus> statuses = await permissionsToRequest.request();
+
+    // Debugging print
     print("Permissions request result: $statuses");
   }
 
@@ -75,6 +94,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _loadGameStateFromFirestore(String userId) async {
     try {
+      // By enabling persistence in main.dart, this works offline too!
       DocumentSnapshot doc = await _db.collection('users').doc(userId).get();
       if (doc.exists) {
         await _prefs.setCurrentLevel(doc.get('currentLevel') ?? 1);
