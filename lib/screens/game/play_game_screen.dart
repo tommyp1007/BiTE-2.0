@@ -1,4 +1,4 @@
-import 'dart:io'; // Import added for Platform checking
+import 'dart:io'; // For Platform checking
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -103,12 +103,12 @@ class _PlayGameScreenState extends State<PlayGameScreen>
 
     // --- Animation for Shining Star (Winner) ---
     _starController = AnimationController(
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 700), // Slightly faster pulse
       vsync: this,
     );
     
     // Create a pulsing effect (scale up and down)
-    _starScaleAnimation = Tween<double>(begin: 1.0, end: 1.25).animate(
+    _starScaleAnimation = Tween<double>(begin: 1.0, end: 1.2).animate(
       CurvedAnimation(parent: _starController, curve: Curves.easeInOut),
     );
 
@@ -193,14 +193,12 @@ class _PlayGameScreenState extends State<PlayGameScreen>
     });
   }
 
-  // ⭐ UPDATED VIBRATION LOGIC
+  // --- VIBRATION LOGIC ---
   void _triggerVibration() {
     if (_vibrationEnabled) {
       if (Platform.isAndroid) {
-        // Standard buzz (Required for many Androids to feel it)
         HapticFeedback.vibrate(); 
       } else {
-        // Taptic feedback (Nicer on iPhone)
         HapticFeedback.mediumImpact(); 
       }
     }
@@ -229,13 +227,11 @@ class _PlayGameScreenState extends State<PlayGameScreen>
 
   // --- Hint Logic ---
   void _triggerHintPopup() {
-    _triggerVibration(); // Vibration
-    
+    _triggerVibration();
     setState(() {
       _hintText = _generateHint(_targetWord);
       _hintUsageCounter++;
     });
-
     _showHintDialog();
   }
 
@@ -275,7 +271,7 @@ class _PlayGameScreenState extends State<PlayGameScreen>
   // --- Input ---
   void _onKeyPress(String char) {
     if (_isGameFinished && _isSuccess) return;
-    _triggerVibration(); // Vibration
+    _triggerVibration(); 
     setState(() {
       if (_isGameFinished && !_isSuccess) {
         _isGameFinished = false;
@@ -288,7 +284,7 @@ class _PlayGameScreenState extends State<PlayGameScreen>
 
   void _onBackspace() {
     if (_isGameFinished && _isSuccess) return;
-    _triggerVibration(); // Vibration
+    _triggerVibration();
     if (_selectedLetters.isNotEmpty) {
       setState(() {
         _selectedLetters.removeLast();
@@ -304,7 +300,7 @@ class _PlayGameScreenState extends State<PlayGameScreen>
   void _onClearAll() {
     if (_isGameFinished && _isSuccess) return;
     if (_selectedLetters.isNotEmpty) {
-      _triggerVibration(); // Vibration (replaced HapticFeedback.vibrate)
+      _triggerVibration();
       setState(() {
         _selectedLetters.clear();
         if (_isGameFinished && !_isSuccess) {
@@ -317,7 +313,7 @@ class _PlayGameScreenState extends State<PlayGameScreen>
   }
 
   void _handleSubmit() {
-    _triggerVibration(); // Vibration
+    _triggerVibration();
     
     String userAnswer = _selectedLetters.join("").trim().toUpperCase();
     String correctAnswer = _targetWord.trim().toUpperCase();
@@ -458,8 +454,8 @@ class _PlayGameScreenState extends State<PlayGameScreen>
                   width: double.infinity,
                   child: ElevatedButton(
                     onPressed: () {
-                       _triggerVibration(); // Vibration
-                       Navigator.of(ctx).pop();
+                        _triggerVibration(); 
+                        Navigator.of(ctx).pop();
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.secondary,
@@ -564,7 +560,7 @@ class _PlayGameScreenState extends State<PlayGameScreen>
                 SizedBox(height: 25),
                 ElevatedButton.icon(
                   onPressed: () {
-                    _triggerVibration(); // Vibration
+                    _triggerVibration(); 
                     Navigator.of(ctx).pop();
                   },
                   style: ElevatedButton.styleFrom(
@@ -616,7 +612,7 @@ class _PlayGameScreenState extends State<PlayGameScreen>
                 SizedBox(height: 25),
                 ElevatedButton(
                   onPressed: () {
-                    _triggerVibration(); // Vibration
+                    _triggerVibration(); 
                     Navigator.of(ctx).pop();
                   },
                   style: ElevatedButton.styleFrom(
@@ -675,7 +671,7 @@ class _PlayGameScreenState extends State<PlayGameScreen>
                     SizedBox(height: 25),
                     ElevatedButton(
                       onPressed: () {
-                        _triggerVibration(); // Vibration
+                        _triggerVibration(); 
                         // Stop animation when leaving
                         _starController.stop(); 
                         Navigator.of(ctx).pop();
@@ -709,7 +705,7 @@ class _PlayGameScreenState extends State<PlayGameScreen>
   // --- STAR DISPLAY LOGIC ---
   Widget _buildStarDisplay(int stars) {
     if (stars == 3) {
-      // Curve Layout for 3 Stars
+      // 3-Star Curve with FULL ANIMATION
       return SizedBox(
         height: 100, 
         width: 180, 
@@ -717,65 +713,76 @@ class _PlayGameScreenState extends State<PlayGameScreen>
           alignment: Alignment.center,
           clipBehavior: Clip.none,
           children: [
-            // Left Star (Tilted Left)
+            // Left Star (Tilted Left, Scaled, Glowing)
             Positioned(
               left: 0,
               bottom: 0,
-              child: Transform.rotate(
-                angle: -20 * pi / 180, // -20 degrees
-                child: Icon(Icons.star_rounded, color: Colors.amber, size: 50),
+              child: ScaleTransition(
+                scale: _starScaleAnimation,
+                child: Transform.rotate(
+                  angle: -20 * pi / 180, // -20 degrees
+                  child: _buildGlowingStar(50),
+                ),
               ),
             ),
-            // Right Star (Tilted Right)
+            // Right Star (Tilted Right, Scaled, Glowing)
             Positioned(
               right: 0,
               bottom: 0,
-              child: Transform.rotate(
-                angle: 20 * pi / 180, // 20 degrees
-                child: Icon(Icons.star_rounded, color: Colors.amber, size: 50),
+              child: ScaleTransition(
+                scale: _starScaleAnimation,
+                child: Transform.rotate(
+                  angle: 20 * pi / 180, // 20 degrees
+                  child: _buildGlowingStar(50),
+                ),
               ),
             ),
-            // Center Star (Higher & Animated)
+            // Center Star (Higher, Scaled, Glowing)
             Positioned(
               top: 0,
               child: ScaleTransition(
-                scale: _starScaleAnimation, // SHINING/PULSING ANIMATION
-                child: Container(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.amber.withOpacity(0.5),
-                        blurRadius: 20,
-                        spreadRadius: 2,
-                      )
-                    ]
-                  ),
-                  child: Icon(Icons.star_rounded, color: Colors.amber, size: 70),
-                ),
+                scale: _starScaleAnimation, 
+                child: _buildGlowingStar(70),
               ),
             ),
           ],
         ),
       );
     } else {
-      // For 1 or 2 Stars
+      // For 1 or 2 Stars (Static)
       return Row(
-        mainAxisSize: MainAxisSize.min, // Sticks them together
+        mainAxisSize: MainAxisSize.min, 
         mainAxisAlignment: MainAxisAlignment.center,
         children: List.generate(3, (index) {
           bool isEarned = index < stars;
           return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4.0), // Slight gap
+            padding: const EdgeInsets.symmetric(horizontal: 4.0), 
             child: Icon(
               Icons.star_rounded,
               color: isEarned ? Colors.amber : Colors.grey[300],
-              size: 45, // Slightly larger than before for better visibility
+              size: 45, 
             ),
           );
         }),
       );
     }
+  }
+
+  // Helper widget to add glow/shine to stars
+  Widget _buildGlowingStar(double size) {
+    return Container(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.amber.withOpacity(0.6), // Shine effect
+            blurRadius: 15,
+            spreadRadius: 2,
+          )
+        ]
+      ),
+      child: Icon(Icons.star_rounded, color: Colors.amber, size: size),
+    );
   }
 
   // --- Navigation ---
@@ -808,7 +815,7 @@ class _PlayGameScreenState extends State<PlayGameScreen>
   }
 
   void _openSettings() async {
-    _triggerVibration(); // Vibrate on open settings
+    _triggerVibration(); 
     await _bgmPlayer.pause();
     _shouldResumeMusic = true;
 
@@ -862,7 +869,7 @@ class _PlayGameScreenState extends State<PlayGameScreen>
                 children: [
                   GestureDetector(
                     onTap: () {
-                      _triggerVibration(); // Vibration
+                      _triggerVibration(); 
                       _shouldResumeMusic = false;
                       _bgmPlayer.stop();
                       Navigator.pushReplacement(
