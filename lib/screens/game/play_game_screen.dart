@@ -1,3 +1,4 @@
+import 'dart:io'; // Import added for Platform checking
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -5,6 +6,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 // Ensure these paths match your project structure
 import '../../theme/app_colors.dart';
 import '../../services/shared_preferences_helper.dart';
@@ -31,6 +33,10 @@ class _PlayGameScreenState extends State<PlayGameScreen>
   // --- Animation ---
   late AnimationController _bulbController;
   late Animation<double> _bulbAnimation;
+
+  // --- Star Animation Controller ---
+  late AnimationController _starController;
+  late Animation<double> _starScaleAnimation;
 
   // --- Firebase & Prefs ---
   final SharedPreferencesHelper _prefs = SharedPreferencesHelper();
@@ -93,6 +99,17 @@ class _PlayGameScreenState extends State<PlayGameScreen>
 
     _bulbAnimation = Tween<double>(begin: 1.0, end: 1.3).animate(
       CurvedAnimation(parent: _bulbController, curve: Curves.easeInOut),
+    );
+
+    // --- Animation for Shining Star (Winner) ---
+    _starController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    
+    // Create a pulsing effect (scale up and down)
+    _starScaleAnimation = Tween<double>(begin: 1.0, end: 1.25).animate(
+      CurvedAnimation(parent: _starController, curve: Curves.easeInOut),
     );
 
     _currentLevel = widget.level;
@@ -176,9 +193,16 @@ class _PlayGameScreenState extends State<PlayGameScreen>
     });
   }
 
+  // ⭐ UPDATED VIBRATION LOGIC
   void _triggerVibration() {
     if (_vibrationEnabled) {
-      HapticFeedback.heavyImpact();
+      if (Platform.isAndroid) {
+        // Standard buzz (Required for many Androids to feel it)
+        HapticFeedback.vibrate(); 
+      } else {
+        // Taptic feedback (Nicer on iPhone)
+        HapticFeedback.mediumImpact(); 
+      }
     }
   }
 
@@ -205,12 +229,10 @@ class _PlayGameScreenState extends State<PlayGameScreen>
 
   // --- Hint Logic ---
   void _triggerHintPopup() {
-    _triggerVibration();
+    _triggerVibration(); // Vibration
     
     setState(() {
-      // Regenerate a NEW random hint every time the button is clicked
       _hintText = _generateHint(_targetWord);
-      // Increment counter every time to penalize repeated use/rerolls
       _hintUsageCounter++;
     });
 
@@ -221,10 +243,9 @@ class _PlayGameScreenState extends State<PlayGameScreen>
     List<String> answerChars = answer.split('');
     List<String> hintChars = [];
 
-    // Initialize with placeholders
     for (var char in answerChars) {
       if (char == ' ') {
-        hintChars.add("   "); // More space for visual separation
+        hintChars.add("   ");
       } else {
         hintChars.add("_");
       }
@@ -234,12 +255,10 @@ class _PlayGameScreenState extends State<PlayGameScreen>
     int revealedCount = 0;
     List<int> validIndices = [];
     
-    // Find all indices that are letters (not spaces)
     for (int i = 0; i < answerChars.length; i++) {
       if (answerChars[i] != ' ') validIndices.add(i);
     }
 
-    // Reveal 2 random letters (or 1 if word is very short, though unlikely here)
     while (revealedCount < 2 && validIndices.isNotEmpty) {
       int randomIndex = rand.nextInt(validIndices.length);
       int actualIndex = validIndices[randomIndex];
@@ -247,7 +266,7 @@ class _PlayGameScreenState extends State<PlayGameScreen>
       if (hintChars[actualIndex] == "_") {
         hintChars[actualIndex] = answerChars[actualIndex];
         revealedCount++;
-        validIndices.removeAt(randomIndex); // Don't pick same index twice
+        validIndices.removeAt(randomIndex);
       }
     }
     return hintChars.join(" ");
@@ -256,7 +275,7 @@ class _PlayGameScreenState extends State<PlayGameScreen>
   // --- Input ---
   void _onKeyPress(String char) {
     if (_isGameFinished && _isSuccess) return;
-    _triggerVibration();
+    _triggerVibration(); // Vibration
     setState(() {
       if (_isGameFinished && !_isSuccess) {
         _isGameFinished = false;
@@ -269,7 +288,7 @@ class _PlayGameScreenState extends State<PlayGameScreen>
 
   void _onBackspace() {
     if (_isGameFinished && _isSuccess) return;
-    _triggerVibration();
+    _triggerVibration(); // Vibration
     if (_selectedLetters.isNotEmpty) {
       setState(() {
         _selectedLetters.removeLast();
@@ -285,7 +304,7 @@ class _PlayGameScreenState extends State<PlayGameScreen>
   void _onClearAll() {
     if (_isGameFinished && _isSuccess) return;
     if (_selectedLetters.isNotEmpty) {
-      HapticFeedback.vibrate();
+      _triggerVibration(); // Vibration (replaced HapticFeedback.vibrate)
       setState(() {
         _selectedLetters.clear();
         if (_isGameFinished && !_isSuccess) {
@@ -298,7 +317,7 @@ class _PlayGameScreenState extends State<PlayGameScreen>
   }
 
   void _handleSubmit() {
-    _triggerVibration();
+    _triggerVibration(); // Vibration
     
     String userAnswer = _selectedLetters.join("").trim().toUpperCase();
     String correctAnswer = _targetWord.trim().toUpperCase();
@@ -384,7 +403,6 @@ class _PlayGameScreenState extends State<PlayGameScreen>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Header
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -402,8 +420,6 @@ class _PlayGameScreenState extends State<PlayGameScreen>
                   ],
                 ),
                 SizedBox(height: 16),
-                
-                // Description Text
                 Text(
                   "Use hints wisely to earn maximum stars!\nEach time you generate a hint, it counts as usage.",
                   textAlign: TextAlign.center,
@@ -414,8 +430,6 @@ class _PlayGameScreenState extends State<PlayGameScreen>
                   ),
                 ),
                 SizedBox(height: 24),
-
-                // Rules Container
                 Container(
                   padding: EdgeInsets.symmetric(horizontal: 16, vertical: 20),
                   decoration: BoxDecoration(
@@ -439,16 +453,16 @@ class _PlayGameScreenState extends State<PlayGameScreen>
                     ],
                   ),
                 ),
-
                 SizedBox(height: 24),
-
-                // Action Button
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: () => Navigator.of(ctx).pop(),
+                    onPressed: () {
+                       _triggerVibration(); // Vibration
+                       Navigator.of(ctx).pop();
+                    },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.secondary, // Uses app theme color
+                      backgroundColor: AppColors.secondary,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -477,7 +491,6 @@ class _PlayGameScreenState extends State<PlayGameScreen>
   Widget _buildRuleRow(int stars, String text) {
     return Row(
       children: [
-        // Star Icons
         Row(
           mainAxisSize: MainAxisSize.min,
           children: List.generate(3, (index) => Icon(
@@ -487,7 +500,6 @@ class _PlayGameScreenState extends State<PlayGameScreen>
           )),
         ),
         SizedBox(width: 16),
-        // Text
         Expanded(
           child: Text(
             text, 
@@ -509,7 +521,7 @@ class _PlayGameScreenState extends State<PlayGameScreen>
       builder: (BuildContext ctx) {
         return Dialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          backgroundColor: Colors.blueGrey[900], // Darker theme for hint
+          backgroundColor: Colors.blueGrey[900],
           child: Padding(
             padding: const EdgeInsets.all(20.0),
             child: Column(
@@ -552,7 +564,8 @@ class _PlayGameScreenState extends State<PlayGameScreen>
                 SizedBox(height: 25),
                 ElevatedButton.icon(
                   onPressed: () {
-                    Navigator.of(ctx).pop(); // Close dialog
+                    _triggerVibration(); // Vibration
+                    Navigator.of(ctx).pop();
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.redAccent,
@@ -603,6 +616,7 @@ class _PlayGameScreenState extends State<PlayGameScreen>
                 SizedBox(height: 25),
                 ElevatedButton(
                   onPressed: () {
+                    _triggerVibration(); // Vibration
                     Navigator.of(ctx).pop();
                   },
                   style: ElevatedButton.styleFrom(
@@ -621,6 +635,13 @@ class _PlayGameScreenState extends State<PlayGameScreen>
   }
 
   void _showCorrectDialog(int stars) {
+    // START the star animation immediately when dialog shows
+    if (stars == 3) {
+      _starController.repeat(reverse: true);
+    } else {
+      _starController.reset();
+    }
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -637,7 +658,9 @@ class _PlayGameScreenState extends State<PlayGameScreen>
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    // REPLACED: New Star Display Logic
                     _buildStarDisplay(stars),
+                    
                     SizedBox(height: 15),
                     Text(
                       "Correct! Well done.",
@@ -652,6 +675,9 @@ class _PlayGameScreenState extends State<PlayGameScreen>
                     SizedBox(height: 25),
                     ElevatedButton(
                       onPressed: () {
+                        _triggerVibration(); // Vibration
+                        // Stop animation when leaving
+                        _starController.stop(); 
                         Navigator.of(ctx).pop();
                         if (_isFinalLevel()) {
                           _redirectToGameOver();
@@ -680,44 +706,72 @@ class _PlayGameScreenState extends State<PlayGameScreen>
     );
   }
 
+  // --- STAR DISPLAY LOGIC ---
   Widget _buildStarDisplay(int stars) {
     if (stars == 3) {
+      // Curve Layout for 3 Stars
       return SizedBox(
-        height: 80,
+        height: 100, 
+        width: 180, 
         child: Stack(
           alignment: Alignment.center,
+          clipBehavior: Clip.none,
           children: [
+            // Left Star (Tilted Left)
             Positioned(
-              left: 20,
-              top: 20,
+              left: 0,
+              bottom: 0,
               child: Transform.rotate(
-                angle: -0.2,
-                child: Icon(Icons.star, color: Colors.amber, size: 50),
+                angle: -20 * pi / 180, // -20 degrees
+                child: Icon(Icons.star_rounded, color: Colors.amber, size: 50),
               ),
             ),
+            // Right Star (Tilted Right)
             Positioned(
-              right: 20,
-              top: 20,
+              right: 0,
+              bottom: 0,
               child: Transform.rotate(
-                angle: 0.2,
-                child: Icon(Icons.star, color: Colors.amber, size: 50),
+                angle: 20 * pi / 180, // 20 degrees
+                child: Icon(Icons.star_rounded, color: Colors.amber, size: 50),
               ),
             ),
+            // Center Star (Higher & Animated)
             Positioned(
               top: 0,
-              child: Icon(Icons.star, color: Colors.amber, size: 70),
+              child: ScaleTransition(
+                scale: _starScaleAnimation, // SHINING/PULSING ANIMATION
+                child: Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.amber.withOpacity(0.5),
+                        blurRadius: 20,
+                        spreadRadius: 2,
+                      )
+                    ]
+                  ),
+                  child: Icon(Icons.star_rounded, color: Colors.amber, size: 70),
+                ),
+              ),
             ),
           ],
         ),
       );
     } else {
+      // For 1 or 2 Stars
       return Row(
+        mainAxisSize: MainAxisSize.min, // Sticks them together
         mainAxisAlignment: MainAxisAlignment.center,
         children: List.generate(3, (index) {
-          return Icon(
-            Icons.star,
-            color: index < stars ? Colors.amber : Colors.grey[300],
-            size: 40,
+          bool isEarned = index < stars;
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4.0), // Slight gap
+            child: Icon(
+              Icons.star_rounded,
+              color: isEarned ? Colors.amber : Colors.grey[300],
+              size: 45, // Slightly larger than before for better visibility
+            ),
           );
         }),
       );
@@ -754,6 +808,7 @@ class _PlayGameScreenState extends State<PlayGameScreen>
   }
 
   void _openSettings() async {
+    _triggerVibration(); // Vibrate on open settings
     await _bgmPlayer.pause();
     _shouldResumeMusic = true;
 
@@ -786,7 +841,8 @@ class _PlayGameScreenState extends State<PlayGameScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _bulbController.dispose(); // Dispose animation controller
+    _bulbController.dispose(); 
+    _starController.dispose(); 
     _bgmPlayer.dispose();
     _sfxPlayer.dispose();
     super.dispose();
@@ -806,6 +862,7 @@ class _PlayGameScreenState extends State<PlayGameScreen>
                 children: [
                   GestureDetector(
                     onTap: () {
+                      _triggerVibration(); // Vibration
                       _shouldResumeMusic = false;
                       _bgmPlayer.stop();
                       Navigator.pushReplacement(
