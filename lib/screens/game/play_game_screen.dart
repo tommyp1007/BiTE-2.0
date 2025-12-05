@@ -5,6 +5,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+// Ensure these paths match your project structure
 import '../../theme/app_colors.dart';
 import '../../services/shared_preferences_helper.dart';
 import '../../services/game_data_manager.dart';
@@ -21,11 +22,15 @@ class PlayGameScreen extends StatefulWidget {
 }
 
 class _PlayGameScreenState extends State<PlayGameScreen>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver, TickerProviderStateMixin {
   // --- Audio ---
   final AudioPlayer _bgmPlayer = AudioPlayer();
   final AudioPlayer _sfxPlayer = AudioPlayer();
-  bool _shouldResumeMusic = false; 
+  bool _shouldResumeMusic = false;
+
+  // --- Animation ---
+  late AnimationController _bulbController;
+  late Animation<double> _bulbAnimation;
 
   // --- Firebase & Prefs ---
   final SharedPreferencesHelper _prefs = SharedPreferencesHelper();
@@ -37,13 +42,15 @@ class _PlayGameScreenState extends State<PlayGameScreen>
   late int _currentLevel;
   String _targetWord = "";
   List<String> _selectedLetters = [];
-  bool _isGameFinished = false;
+  bool _isGameFinished = false; // Used to lock input
   bool _isSuccess = false;
-  bool _showHint = false;
-  String _hintText = "";
-  int _hintUsageCounter = 0; 
   
-  // Track stars earned in this session for display
+  // Hint State
+  bool _hintGenerated = false; // Tracks if the hint has been bought/generated
+  String _hintText = "";
+  int _hintUsageCounter = 0;
+
+  // Track stars earned in this session
   int _currentRunStars = 0;
 
   // --- Settings State ---
@@ -64,6 +71,7 @@ class _PlayGameScreenState extends State<PlayGameScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
 
+    // --- Audio Context ---
     AudioPlayer.global.setAudioContext(AudioContext(
       iOS: AudioContextIOS(
         category: AVAudioSessionCategory.playback,
@@ -77,6 +85,16 @@ class _PlayGameScreenState extends State<PlayGameScreen>
         audioFocus: AndroidAudioFocus.none,
       ),
     ));
+
+    // --- Animation for Shining Bulb ---
+    _bulbController = AnimationController(
+      duration: const Duration(seconds: 1),
+      vsync: this,
+    )..repeat(reverse: true); // Pulse back and forth
+
+    _bulbAnimation = Tween<double>(begin: 1.0, end: 1.3).animate(
+      CurvedAnimation(parent: _bulbController, curve: Curves.easeInOut),
+    );
 
     _currentLevel = widget.level;
     _initializeLevel();
@@ -108,9 +126,10 @@ class _PlayGameScreenState extends State<PlayGameScreen>
     _selectedLetters.clear();
     _isGameFinished = false;
     _isSuccess = false;
-    _showHint = false;
+    
+    _hintGenerated = false;
     _hintText = "";
-    _hintUsageCounter = 0; 
+    _hintUsageCounter = 0;
     _currentRunStars = 0;
 
     _prefs.setCurrentLevel(_currentLevel);
@@ -134,8 +153,7 @@ class _PlayGameScreenState extends State<PlayGameScreen>
     if (startMusic) {
       _playRandomBackgroundMusic();
     } else {
-      if (_bgmPlayer.state != PlayerState.playing &&
-          (!_isGameFinished || !_isSuccess)) {
+      if (_bgmPlayer.state != PlayerState.playing && !_isGameFinished) {
         _bgmPlayer.resume();
       }
     }
@@ -187,18 +205,20 @@ class _PlayGameScreenState extends State<PlayGameScreen>
     }
   }
 
-  // --- Hint ---
-  void _toggleHint() {
+  // --- Hint Logic ---
+  void _triggerHintPopup() {
     _triggerVibration();
+    
     setState(() {
-      if (_showHint) {
-        _showHint = false;
-      } else {
+      // Generate hint only if not already generated for this level
+      if (!_hintGenerated) {
         _hintText = _generateHint(_targetWord);
-        _showHint = true;
+        _hintGenerated = true;
         _hintUsageCounter++;
       }
     });
+
+    _showHintDialog();
   }
 
   String _generateHint(String answer) {
@@ -278,15 +298,7 @@ class _PlayGameScreenState extends State<PlayGameScreen>
 
   void _handleSubmit() {
     _triggerVibration();
-    if (_isGameFinished && _isSuccess) {
-      if (_isFinalLevel()) {
-        _redirectToGameOver();
-      } else {
-        _goToNextLevel();
-      }
-      return;
-    }
-
+    
     String userAnswer = _selectedLetters.join("").trim().toUpperCase();
     String correctAnswer = _targetWord.trim().toUpperCase();
 
@@ -295,15 +307,11 @@ class _PlayGameScreenState extends State<PlayGameScreen>
       _handleCorrectAnswer();
     } else {
       _playSound('wrong');
-      setState(() {
-        _isGameFinished = true;
-        _isSuccess = false;
-      });
+      _showWrongDialog();
     }
   }
 
   void _handleCorrectAnswer() async {
-    // 1. Calculate Stars for THIS run
     int starsEarned;
     if (_hintUsageCounter <= 3) {
       starsEarned = 3;
@@ -313,22 +321,19 @@ class _PlayGameScreenState extends State<PlayGameScreen>
       starsEarned = 1;
     }
 
-    // 2. Fetch current BEST score from storage
     int currentBestStars = await _prefs.getStarsForLevel(_currentLevel);
 
     setState(() {
       _isGameFinished = true;
       _isSuccess = true;
-      _currentRunStars = starsEarned; 
+      _currentRunStars = starsEarned;
     });
 
-    // 3. Only save if new score is BETTER
     if (starsEarned > currentBestStars) {
       await _prefs.setStarsForLevel(_currentLevel, starsEarned);
       await _dataManager.saveLevelStars(_currentLevel, starsEarned);
     }
 
-    // 4. Robust Unlock Sync
     User? user = _auth.currentUser;
     int serverUnlockedLevel = 1;
 
@@ -339,7 +344,6 @@ class _PlayGameScreenState extends State<PlayGameScreen>
            serverUnlockedLevel = doc.get('unlockedLevel') ?? 1;
         }
       } catch (e) {
-        print("Error fetching server unlocked level: $e");
         serverUnlockedLevel = await _prefs.getUnlockedLevel();
       }
 
@@ -355,12 +359,239 @@ class _PlayGameScreenState extends State<PlayGameScreen>
         await _prefs.setUnlockedLevel(_currentLevel + 1);
       }
     }
+
+    _showCorrectDialog(starsEarned);
   }
 
   bool _isFinalLevel() {
     return (_currentLevel == 5 || _currentLevel == 10 || _currentLevel == 15);
   }
 
+  // --- DIALOGS ---
+
+  void _showHintDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext ctx) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          backgroundColor: Colors.blueGrey[900], // Darker theme for hint
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.lightbulb, color: Colors.yellowAccent, size: 40),
+                    SizedBox(width: 10),
+                    Text(
+                      "Hint",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 20),
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.black26,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.amber, width: 2)
+                  ),
+                  child: Text(
+                    _hintText,
+                    style: TextStyle(
+                      fontSize: 30,
+                      letterSpacing: 4,
+                      color: Colors.amberAccent,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                SizedBox(height: 25),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.of(ctx).pop(); // Close dialog
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.redAccent,
+                    shape: StadiumBorder(),
+                    padding: EdgeInsets.symmetric(horizontal: 30, vertical: 12),
+                  ),
+                  icon: Icon(Icons.close, color: Colors.white),
+                  label: Text("Close Hint", style: TextStyle(color: Colors.white, fontSize: 18)),
+                )
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showWrongDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext ctx) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          backgroundColor: Colors.white,
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Image.asset('assets/images/wrong.png', height: 60),
+                SizedBox(height: 15),
+                Text(
+                  "Incorrect!",
+                  style: TextStyle(
+                    color: Colors.redAccent,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  "Try again",
+                  style: TextStyle(
+                    color: Colors.black87,
+                    fontSize: 16,
+                  ),
+                ),
+                SizedBox(height: 25),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(ctx).pop();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.redAccent,
+                    shape: StadiumBorder(),
+                    padding: EdgeInsets.symmetric(horizontal: 30, vertical: 12),
+                  ),
+                  child: Text("Retry", style: TextStyle(color: Colors.white, fontSize: 18)),
+                )
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showCorrectDialog(int stars) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext ctx) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          backgroundColor: Colors.white,
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.center,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 40.0, bottom: 20, left: 20, right: 20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildStarDisplay(stars),
+                    SizedBox(height: 15),
+                    Text(
+                      "Correct! Well done.",
+                      style: TextStyle(
+                        color: Colors.green[700],
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SizedBox(height: 15),
+                    Image.asset('assets/images/correct.png', height: 50),
+                    SizedBox(height: 25),
+                    ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(ctx).pop();
+                        if (_isFinalLevel()) {
+                          _redirectToGameOver();
+                        } else {
+                          _goToNextLevel();
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.secondary,
+                        shape: StadiumBorder(),
+                        padding: EdgeInsets.symmetric(horizontal: 30, vertical: 12),
+                        elevation: 5,
+                      ),
+                      child: Text(
+                        _isFinalLevel() ? "Finish Game" : "Next Level",
+                        style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                    )
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildStarDisplay(int stars) {
+    if (stars == 3) {
+      return SizedBox(
+        height: 80,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Positioned(
+              left: 20,
+              top: 20,
+              child: Transform.rotate(
+                angle: -0.2,
+                child: Icon(Icons.star, color: Colors.amber, size: 50),
+              ),
+            ),
+            Positioned(
+              right: 20,
+              top: 20,
+              child: Transform.rotate(
+                angle: 0.2,
+                child: Icon(Icons.star, color: Colors.amber, size: 50),
+              ),
+            ),
+            Positioned(
+              top: 0,
+              child: Icon(Icons.star, color: Colors.amber, size: 70),
+            ),
+          ],
+        ),
+      );
+    } else {
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: List.generate(3, (index) {
+          return Icon(
+            Icons.star,
+            color: index < stars ? Colors.amber : Colors.grey[300],
+            size: 40,
+          );
+        }),
+      );
+    }
+  }
+
+  // --- Navigation ---
   void _redirectToGameOver() {
     Navigator.pushReplacement(
       context,
@@ -422,6 +653,7 @@ class _PlayGameScreenState extends State<PlayGameScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _bulbController.dispose(); // Dispose animation controller
     _bgmPlayer.dispose();
     _sfxPlayer.dispose();
     super.dispose();
@@ -429,15 +661,6 @@ class _PlayGameScreenState extends State<PlayGameScreen>
 
   @override
   Widget build(BuildContext context) {
-    String buttonText = "Submit";
-    if (_isGameFinished) {
-      if (_isSuccess) {
-        buttonText = _isFinalLevel() ? "Finish Game" : "Next Level";
-      } else {
-        buttonText = "Submit";
-      }
-    }
-
     return Scaffold(
       backgroundColor: AppColors.primary,
       body: SafeArea(
@@ -499,12 +722,10 @@ class _PlayGameScreenState extends State<PlayGameScreen>
                 builder: (context, constraints) {
                   return SingleChildScrollView(
                     child: ConstrainedBox(
-                      // Ensure content takes full height to allow centering
                       constraints: BoxConstraints(
                         minHeight: constraints.maxHeight,
                       ),
                       child: Center(
-                        // Limit width on large screens
                         child: Container(
                           constraints: BoxConstraints(maxWidth: 600),
                           padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -568,107 +789,13 @@ class _PlayGameScreenState extends State<PlayGameScreen>
 
                               SizedBox(height: 20),
 
-                              // 3. FEEDBACK / HINT AREA
-                              if (_isGameFinished) ...[
-                                if (_isSuccess)
-                                  Column(
-                                    children: [
-                                      Image.asset(
-                                          'assets/images/correct.png',
-                                          height: 40),
-                                      SizedBox(height: 5),
-                                      Text(
-                                        "Correct! Well done.",
-                                        style: TextStyle(
-                                          color: Colors.greenAccent,
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      SizedBox(height: 5),
-                                      // Star Rating Display
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: List.generate(3, (index) {
-                                          return Padding(
-                                            padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                                            child: Icon(
-                                              Icons.star,
-                                              color: index < _currentRunStars 
-                                                  ? Colors.amber 
-                                                  : Colors.white24,
-                                              size: 32,
-                                              shadows: [
-                                                Shadow(color: Colors.black26, blurRadius: 4, offset: Offset(2,2))
-                                              ],
-                                            ),
-                                          );
-                                        }),
-                                      )
-                                    ],
-                                  )
-                                else
-                                  Column(
-                                    children: [
-                                      Image.asset(
-                                          'assets/images/wrong.png',
-                                          height: 40),
-                                      SizedBox(height: 5),
-                                      Text(
-                                        "Incorrect! Try again.",
-                                        style: TextStyle(
-                                          color: Colors.redAccent,
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ],
-                                  )
-                              ] else ...[
-                                if (_showHint) ...[
-                                  Container(
-                                    padding: EdgeInsets.all(12),
-                                    margin: EdgeInsets.only(bottom: 10),
-                                    decoration: BoxDecoration(
-                                      color: Colors.black26,
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                          color: Colors.amber, width: 2),
-                                    ),
-                                    child: Text(
-                                      _hintText,
-                                      style: TextStyle(
-                                        fontSize: 24,
-                                        letterSpacing: 2,
-                                        color: Colors.amberAccent,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                  ElevatedButton.icon(
-                                    onPressed: _toggleHint,
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.redAccent,
-                                      padding: EdgeInsets.symmetric(
-                                          horizontal: 24, vertical: 12),
-                                      shape: StadiumBorder(),
-                                      elevation: 4,
-                                    ),
-                                    icon: Icon(Icons.close, color: Colors.white, size: 24),
-                                    label: Text(
-                                      "Close Hint",
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ),
-                                ] else ...[
-                                  // This space is reserved so layout doesn't jump too much
-                                  SizedBox(height: 10),
-                                  ElevatedButton.icon(
-                                    onPressed: _toggleHint,
+                              // 3. SHINING HINT BUTTON (Popup Trigger)
+                              // Only show if game is active
+                              if (!_isGameFinished)
+                                Container(
+                                  margin: EdgeInsets.only(bottom: 10),
+                                  child: ElevatedButton.icon(
+                                    onPressed: _triggerHintPopup,
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: Colors.amber.shade700,
                                       foregroundColor: Colors.white,
@@ -677,21 +804,25 @@ class _PlayGameScreenState extends State<PlayGameScreen>
                                       shape: StadiumBorder(),
                                       elevation: 5,
                                     ),
-                                    icon: Icon(Icons.lightbulb,
-                                        size: 22, color: Colors.yellowAccent),
+                                    // Animated Bulb Icon
+                                    icon: ScaleTransition(
+                                      scale: _bulbAnimation,
+                                      child: Icon(Icons.lightbulb,
+                                          size: 32, // Bigger size
+                                          color: Colors.yellowAccent),
+                                    ),
                                     label: Text(
                                       "Need a Hint?",
                                       style: TextStyle(
-                                        fontSize: 16,
+                                        fontSize: 18,
                                         fontWeight: FontWeight.bold,
                                         letterSpacing: 0.5,
                                       ),
                                     ),
                                   ),
-                                ],
-                              ],
+                                ),
 
-                              SizedBox(height: 25),
+                              SizedBox(height: 15),
 
                               // 4. KEYBOARD GRID
                               GridView.builder(
@@ -720,15 +851,8 @@ class _PlayGameScreenState extends State<PlayGameScreen>
                                   Expanded(
                                     child: ElevatedButton(
                                       onPressed: () {
-                                        _triggerVibration();
-                                        if (_isGameFinished && !_isSuccess) {
-                                          setState(() {
-                                            _isGameFinished = false;
-                                            _selectedLetters.clear();
-                                          });
-                                        } else {
-                                          _handleSubmit();
-                                        }
+                                        if (_isGameFinished && _isSuccess) return;
+                                        _handleSubmit();
                                       },
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: AppColors.secondary,
@@ -738,9 +862,7 @@ class _PlayGameScreenState extends State<PlayGameScreen>
                                         elevation: 4,
                                       ),
                                       child: Text(
-                                        (_isGameFinished && !_isSuccess)
-                                            ? "Retry"
-                                            : buttonText,
+                                        "Submit",
                                         style: TextStyle(
                                             fontSize: 18, color: Colors.white),
                                       ),
