@@ -46,7 +46,6 @@ class _PlayGameScreenState extends State<PlayGameScreen>
   bool _isSuccess = false;
   
   // Hint State
-  bool _hintGenerated = false; // Tracks if the hint has been bought/generated
   String _hintText = "";
   int _hintUsageCounter = 0;
 
@@ -127,7 +126,6 @@ class _PlayGameScreenState extends State<PlayGameScreen>
     _isGameFinished = false;
     _isSuccess = false;
     
-    _hintGenerated = false;
     _hintText = "";
     _hintUsageCounter = 0;
     _currentRunStars = 0;
@@ -210,12 +208,10 @@ class _PlayGameScreenState extends State<PlayGameScreen>
     _triggerVibration();
     
     setState(() {
-      // Generate hint only if not already generated for this level
-      if (!_hintGenerated) {
-        _hintText = _generateHint(_targetWord);
-        _hintGenerated = true;
-        _hintUsageCounter++;
-      }
+      // Regenerate a NEW random hint every time the button is clicked
+      _hintText = _generateHint(_targetWord);
+      // Increment counter every time to penalize repeated use/rerolls
+      _hintUsageCounter++;
     });
 
     _showHintDialog();
@@ -225,9 +221,10 @@ class _PlayGameScreenState extends State<PlayGameScreen>
     List<String> answerChars = answer.split('');
     List<String> hintChars = [];
 
+    // Initialize with placeholders
     for (var char in answerChars) {
       if (char == ' ') {
-        hintChars.add("   ");
+        hintChars.add("   "); // More space for visual separation
       } else {
         hintChars.add("_");
       }
@@ -236,17 +233,21 @@ class _PlayGameScreenState extends State<PlayGameScreen>
     Random rand = Random();
     int revealedCount = 0;
     List<int> validIndices = [];
+    
+    // Find all indices that are letters (not spaces)
     for (int i = 0; i < answerChars.length; i++) {
       if (answerChars[i] != ' ') validIndices.add(i);
     }
 
+    // Reveal 2 random letters (or 1 if word is very short, though unlikely here)
     while (revealedCount < 2 && validIndices.isNotEmpty) {
       int randomIndex = rand.nextInt(validIndices.length);
       int actualIndex = validIndices[randomIndex];
+      
       if (hintChars[actualIndex] == "_") {
         hintChars[actualIndex] = answerChars[actualIndex];
         revealedCount++;
-        validIndices.removeAt(randomIndex);
+        validIndices.removeAt(randomIndex); // Don't pick same index twice
       }
     }
     return hintChars.join(" ");
@@ -375,49 +376,94 @@ class _PlayGameScreenState extends State<PlayGameScreen>
       barrierDismissible: true,
       builder: (BuildContext ctx) {
         return Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
           backgroundColor: Colors.white,
+          elevation: 8,
           child: Padding(
-            padding: const EdgeInsets.all(20.0),
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Header
                 Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.info_outline, color: Colors.blueAccent, size: 28),
-                    SizedBox(width: 10),
+                    Icon(Icons.stars_rounded, color: Colors.amber[700], size: 32),
+                    SizedBox(width: 12),
                     Text(
                       "Scoring Rules",
                       style: TextStyle(
-                        fontSize: 22, 
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87
+                        fontSize: 24, 
+                        fontWeight: FontWeight.w800,
+                        color: Colors.black87,
+                        letterSpacing: -0.5,
                       ),
                     ),
                   ],
                 ),
-                SizedBox(height: 15),
+                SizedBox(height: 16),
+                
+                // Description Text
                 Text(
-                  "Use hints wisely to earn maximum stars!",
-                  style: TextStyle(fontSize: 16, color: Colors.black54),
+                  "Use hints wisely to earn maximum stars!\nEach time you generate a hint, it counts as usage.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 15, 
+                    color: Colors.grey[600],
+                    height: 1.4,
+                  ),
                 ),
-                SizedBox(height: 15),
-                _buildRuleRow(3, "0 - 3 Hints used"),
-                SizedBox(height: 8),
-                _buildRuleRow(2, "4 - 6 Hints used"),
-                SizedBox(height: 8),
-                _buildRuleRow(1, "7+ Hints used"),
-                SizedBox(height: 25),
-                Center(
+                SizedBox(height: 24),
+
+                // Rules Container
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[50],
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.grey[200]!),
+                  ),
+                  child: Column(
+                    children: [
+                      _buildRuleRow(3, "0 - 3 Hints used"),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        child: Divider(height: 1, color: Colors.grey[300]),
+                      ),
+                      _buildRuleRow(2, "4 - 6 Hints used"),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        child: Divider(height: 1, color: Colors.grey[300]),
+                      ),
+                      _buildRuleRow(1, "7+ Hints used"),
+                    ],
+                  ),
+                ),
+
+                SizedBox(height: 24),
+
+                // Action Button
+                SizedBox(
+                  width: double.infinity,
                   child: ElevatedButton(
                     onPressed: () => Navigator.of(ctx).pop(),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blueAccent,
-                      shape: StadiumBorder(),
-                      padding: EdgeInsets.symmetric(horizontal: 30, vertical: 10),
+                      backgroundColor: AppColors.secondary, // Uses app theme color
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                      elevation: 0,
                     ),
-                    child: Text("Got it!", style: TextStyle(color: Colors.white)),
+                    child: Text(
+                      "Got it!", 
+                      style: TextStyle(
+                        fontSize: 16, 
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5,
+                      )
+                    ),
                   ),
                 )
               ],
@@ -431,15 +477,27 @@ class _PlayGameScreenState extends State<PlayGameScreen>
   Widget _buildRuleRow(int stars, String text) {
     return Row(
       children: [
+        // Star Icons
         Row(
+          mainAxisSize: MainAxisSize.min,
           children: List.generate(3, (index) => Icon(
-            Icons.star, 
-            size: 20, 
+            Icons.star_rounded, 
+            size: 24, 
             color: index < stars ? Colors.amber : Colors.grey[300]
           )),
         ),
-        SizedBox(width: 12),
-        Text(text, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        SizedBox(width: 16),
+        // Text
+        Expanded(
+          child: Text(
+            text, 
+            style: TextStyle(
+              fontSize: 16, 
+              fontWeight: FontWeight.w600,
+              color: Colors.black87
+            )
+          ),
+        ),
       ],
     );
   }
