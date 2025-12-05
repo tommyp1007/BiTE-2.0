@@ -71,91 +71,134 @@ class _DictionaryMeaningScreenState extends State<DictionaryMeaningScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Custom Header
+            // Custom Header (Fixed at top)
             AppHeader(title: "BiTE Translator"),
             
-            SizedBox(height: 20),
-            Text(
-              "Dictionary Meaning", 
-              style: TextStyle(color: AppColors.white, fontSize: 24, fontWeight: FontWeight.bold)
-            ),
-            
+            // Expanded area that contains the scrollable content
             Expanded(
-              child: SingleChildScrollView(
-                padding: EdgeInsets.all(16),
-                child: Container(
-                  padding: EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppColors.white,
-                    borderRadius: BorderRadius.circular(0), // Standard rectangular shape
-                    boxShadow: [
-                      BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 2))
-                    ]
-                  ),
-                  width: double.infinity,
-                  child: Column(
-                    // FIX: Align children (Text) to the start (left)
-                    crossAxisAlignment: CrossAxisAlignment.start, 
-                    children: [
-                      // FIX: Wrap Image in Center so it stays centered
-                      Center(
-                        child: Image.asset(
-                          'assets/images/$imageFilename.png', 
-                          width: 150, 
-                          height: 150,
-                          fit: BoxFit.contain,
-                          errorBuilder: (context, error, stackTrace) {
-                            return Image.asset(
-                              'assets/images/default_image.png', 
-                              width: 150, 
-                              height: 150,
-                              fit: BoxFit.contain
-                            );
-                          },
-                        ),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return SingleChildScrollView(
+                    padding: EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+                    child: ConstrainedBox(
+                      // Ensures content is at least the height of the view, 
+                      // allowing alignment logic to work
+                      constraints: BoxConstraints(
+                        minHeight: constraints.maxHeight,
                       ),
-                      
-                      SizedBox(height: 20),
-                      
-                      // FIX: Wrap Play Button in Center so it stays centered
-                      Center(
-                        child: GestureDetector(
-                          onTap: _audioUrl == null ? null : _toggleAudio,
-                          child: Image.asset(
-                            _isPlaying ? 'assets/images/pause_orange.png' : 'assets/images/play_orange.png', 
-                            width: 60, 
-                            height: 60,
-                            errorBuilder: (c,e,s) => Icon(Icons.play_circle_fill, size: 60, color: AppColors.secondary),
+                      child: Center(
+                        // Limits the width on Tablet/Desktop for a nice card look
+                        child: Container(
+                          constraints: BoxConstraints(maxWidth: 600),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center, // Vertically center content
+                            children: [
+                              Text(
+                                "Dictionary Meaning", 
+                                style: TextStyle(
+                                  color: AppColors.white, 
+                                  fontSize: 24, 
+                                  fontWeight: FontWeight.bold
+                                )
+                              ),
+                              
+                              SizedBox(height: 20),
+                              
+                              // The White Card Container
+                              Container(
+                                padding: EdgeInsets.all(24),
+                                decoration: BoxDecoration(
+                                  color: AppColors.white,
+                                  borderRadius: BorderRadius.circular(16), // Rounded corners look better
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black26, 
+                                      blurRadius: 8, 
+                                      offset: Offset(0, 4)
+                                    )
+                                  ]
+                                ),
+                                width: double.infinity,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start, 
+                                  children: [
+                                    // Image
+                                    Center(
+                                      child: Image.asset(
+                                        'assets/images/$imageFilename.png', 
+                                        width: 150, 
+                                        height: 150,
+                                        fit: BoxFit.contain,
+                                        errorBuilder: (context, error, stackTrace) {
+                                          return Image.asset(
+                                            'assets/images/default_image.png', 
+                                            width: 150, 
+                                            height: 150,
+                                            fit: BoxFit.contain
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                    
+                                    SizedBox(height: 20),
+                                    
+                                    // Audio Play Button
+                                    Center(
+                                      child: GestureDetector(
+                                        onTap: _audioUrl == null ? null : _toggleAudio,
+                                        child: Image.asset(
+                                          _isPlaying ? 'assets/images/pause_orange.png' : 'assets/images/play_orange.png', 
+                                          width: 60, 
+                                          height: 60,
+                                          errorBuilder: (c,e,s) => Icon(Icons.play_circle_fill, size: 60, color: AppColors.secondary),
+                                        ),
+                                      ),
+                                    ),
+                                    
+                                    SizedBox(height: 20),
+                                    
+                                    // Word Text
+                                    Text(
+                                      widget.word, 
+                                      style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AppColors.primary)
+                                    ),
+                                    
+                                    // Type & Category
+                                    SizedBox(height: 8),
+                                    Text("Type: Verb", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey[800])),
+                                    Text("Category: Activities", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey[800])),
+                                    
+                                    Divider(height: 30, thickness: 1),
+                                    
+                                    // English Meaning
+                                    Text("English meaning", style: TextStyle(fontSize: 16, color: Colors.grey[600])),
+                                    SizedBox(height: 4),
+                                    Text(
+                                      widget.english ?? 'N/A', 
+                                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.black)
+                                    ),
+                                    
+                                    SizedBox(height: 20),
+                                    
+                                    // Malay Meaning
+                                    Text("Malay meaning", style: TextStyle(fontSize: 16, color: Colors.grey[600])),
+                                    SizedBox(height: 4),
+                                    Text(
+                                      widget.malay ?? 'N/A', 
+                                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.black)
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              // Spacer at bottom so card doesn't touch navigation bar
+                              SizedBox(height: 20),
+                            ],
                           ),
                         ),
                       ),
-                      
-                      SizedBox(height: 10),
-                      
-                      // Word Text (Left Aligned)
-                      Text(
-                        widget.word, 
-                        style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold, color: AppColors.primary)
-                      ),
-                      
-                      // Type & Category (Left Aligned)
-                      Text("Type: Verb", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.black)),
-                      Text("Category: Activities", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.black)),
-                      
-                      SizedBox(height: 10),
-                      
-                      // English Meaning (Left Aligned)
-                      Text("English meaning", style: TextStyle(fontSize: 20, color: AppColors.black)),
-                      Text("English: ${widget.english ?? 'N/A'}", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.black)),
-                      
-                      SizedBox(height: 10),
-                      
-                      // Malay Meaning (Left Aligned)
-                      Text("Malay meaning", style: TextStyle(fontSize: 20, color: AppColors.black)),
-                      Text("Malay: ${widget.malay ?? 'N/A'}", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.black)),
-                    ],
-                  ),
-                ),
+                    ),
+                  );
+                },
               ),
             )
           ],

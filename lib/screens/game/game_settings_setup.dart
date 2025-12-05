@@ -128,12 +128,10 @@ class _GameSettingsScreenState extends State<GameSettingsScreen> {
     await _prefsHelper.resetGameProgress();
     
     // ⭐ CRITICAL: Manually set difficulty back to easy in SharedPreferences
-    // This ensures that when the next screen loads, it knows to show the "Easy" layout (Levels 1-5)
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString("difficulty", "easy");
     
     // 2. Reset Firebase (Cloud)
-    // Ensure your GameDataManager also updates 'difficulty' to 'easy' (as updated in previous step)
     await _gameDataManager.resetGameProgress();
 
     if (mounted) {
@@ -149,12 +147,10 @@ class _GameSettingsScreenState extends State<GameSettingsScreen> {
       );
 
       // 4. Navigate back to GameLevelScreen cleanly
-      // We use pushAndRemoveUntil to REMOVE all previous routes (including the stuck LevelScreen)
-      // This forces the app to create a BRAND NEW GameLevelScreen instance, running initState() fresh.
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (context) => GameLevelScreen()),
-        (Route<dynamic> route) => false, // Clears the stack completely
+        (Route<dynamic> route) => false, 
       );
     }
   }
@@ -164,139 +160,170 @@ class _GameSettingsScreenState extends State<GameSettingsScreen> {
     return Scaffold(
       backgroundColor: AppColors.primary,
       body: SafeArea(
-        child: Column(
-          children: [
-            // --- Header ---
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Row(
-                children: [
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: Image.asset('assets/images/back_icon.png', width: 40),
-                  ),
-                  const Expanded(
-                    child: Center(
-                      child: Text(
-                        "SETTINGS",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 32,
-                          fontWeight: FontWeight.bold,
-                          shadows: [Shadow(color: Colors.blue, offset: Offset(2, 2), blurRadius: 4)],
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 40), // Balances the back icon
-                ],
-              ),
-            ),
-
-            Expanded(
-              child: Container(
-                margin: const EdgeInsets.all(20),
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: AppColors.secondary, width: 2),
+        // LayoutBuilder ensures we know screen dimensions for centering logic
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              child: ConstrainedBox(
+                // Forces the content to be at least the height of the screen
+                constraints: BoxConstraints(
+                  minHeight: constraints.maxHeight,
                 ),
-                child: Column(
-                  children: [
-                    // --- BGM Volume ---
-                    _buildSectionTitle("Music Volume"),
-                    Row(
+                child: Center(
+                  // Limits width for Tablets/Desktop so settings don't look stretched
+                  child: Container(
+                    constraints: BoxConstraints(maxWidth: 600),
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.music_note, color: Colors.white),
-                        Expanded(
-                          child: Slider(
-                            value: _bgmVolume,
-                            min: 0.0,
-                            max: 1.0,
-                            activeColor: AppColors.secondary,
-                            inactiveColor: Colors.white30,
-                            onChanged: _updateBgmVolume,
-                            onChangeEnd: (_) => _playSound('pop', volumeOverride: _bgmVolume),
+                        // --- Header (Back + Title) ---
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 20.0),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              GestureDetector(
+                                onTap: () => Navigator.pop(context),
+                                child: Image.asset('assets/images/back_icon.png', width: 40),
+                              ),
+                              const Text(
+                                "SETTINGS",
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.bold,
+                                  shadows: [Shadow(color: Colors.blue, offset: Offset(2, 2), blurRadius: 4)],
+                                ),
+                              ),
+                              const SizedBox(width: 40), // Spacer to balance the Back Icon
+                            ],
                           ),
                         ),
-                        Text("${(_bgmVolume * 100).toInt()}%", style: const TextStyle(color: Colors.white)),
-                      ],
-                    ),
 
-                    const SizedBox(height: 30),
+                        // --- Settings Container ---
+                        Container(
+                          padding: const EdgeInsets.all(24),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: AppColors.secondary, width: 2),
+                          ),
+                          child: Column(
+                            children: [
+                              // --- BGM Volume ---
+                              _buildSectionTitle("Music Volume"),
+                              Row(
+                                children: [
+                                  const Icon(Icons.music_note, color: Colors.white),
+                                  Expanded(
+                                    child: Slider(
+                                      value: _bgmVolume,
+                                      min: 0.0,
+                                      max: 1.0,
+                                      activeColor: AppColors.secondary,
+                                      inactiveColor: Colors.white30,
+                                      onChanged: _updateBgmVolume,
+                                      onChangeEnd: (_) => _playSound('pop', volumeOverride: _bgmVolume),
+                                    ),
+                                  ),
+                                  SizedBox(
+                                    width: 40,
+                                    child: Text(
+                                      "${(_bgmVolume * 100).toInt()}%", 
+                                      style: const TextStyle(color: Colors.white),
+                                      textAlign: TextAlign.end,
+                                    ),
+                                  ),
+                                ],
+                              ),
 
-                    // --- SFX Volume ---
-                    _buildSectionTitle("Sound Effects"),
-                    Row(
-                      children: [
-                        const Icon(Icons.touch_app, color: Colors.white),
-                        Expanded(
-                          child: Slider(
-                            value: _sfxVolume,
-                            min: 0.0,
-                            max: 1.0,
-                            activeColor: AppColors.secondary,
-                            inactiveColor: Colors.white30,
-                            onChanged: _updateSfxVolume,
-                            onChangeEnd: (_) => _playSound('pop', volumeOverride: _sfxVolume),
+                              const SizedBox(height: 30),
+
+                              // --- SFX Volume ---
+                              _buildSectionTitle("Sound Effects"),
+                              Row(
+                                children: [
+                                  const Icon(Icons.touch_app, color: Colors.white),
+                                  Expanded(
+                                    child: Slider(
+                                      value: _sfxVolume,
+                                      min: 0.0,
+                                      max: 1.0,
+                                      activeColor: AppColors.secondary,
+                                      inactiveColor: Colors.white30,
+                                      onChanged: _updateSfxVolume,
+                                      onChangeEnd: (_) => _playSound('pop', volumeOverride: _sfxVolume),
+                                    ),
+                                  ),
+                                  SizedBox(
+                                    width: 40,
+                                    child: Text(
+                                      "${(_sfxVolume * 100).toInt()}%", 
+                                      style: const TextStyle(color: Colors.white),
+                                      textAlign: TextAlign.end,
+                                    ),
+                                  ),
+                                ],
+                              ),
+
+                              const SizedBox(height: 30),
+
+                              // --- Vibration Toggle ---
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  _buildSectionTitle("Vibration", paddingBottom: 0),
+                                  Switch(
+                                    value: _vibrationEnabled,
+                                    activeColor: AppColors.secondary,
+                                    onChanged: _toggleVibration,
+                                  ),
+                                ],
+                              ),
+
+                              // Spacer replaced with SizedBox for scroll safety
+                              const SizedBox(height: 40),
+                              
+                              // --- Reset Progress Button ---
+                              const Divider(color: Colors.white30),
+                              const SizedBox(height: 20),
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton.icon(
+                                  onPressed: _confirmReset,
+                                  icon: const Icon(Icons.delete_forever, color: Colors.white),
+                                  label: const Text(
+                                    "RESET GAME PROGRESS", 
+                                    style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.redAccent.shade700,
+                                    padding: const EdgeInsets.symmetric(vertical: 14),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        Text("${(_sfxVolume * 100).toInt()}%", style: const TextStyle(color: Colors.white)),
                       ],
                     ),
-
-                    const SizedBox(height: 30),
-
-                    // --- Vibration Toggle ---
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        _buildSectionTitle("Vibration"),
-                        Switch(
-                          value: _vibrationEnabled,
-                          activeColor: AppColors.secondary,
-                          onChanged: _toggleVibration,
-                        ),
-                      ],
-                    ),
-
-                    const Spacer(),
-                    
-                    // --- Reset Progress Button ---
-                    const Divider(color: Colors.white30),
-                    const SizedBox(height: 10),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: _confirmReset,
-                        icon: const Icon(Icons.delete_forever, color: Colors.white),
-                        label: const Text(
-                          "RESET GAME PROGRESS", 
-                          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.redAccent.shade700,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            );
+          },
         ),
       ),
     );
   }
 
-  Widget _buildSectionTitle(String title) {
+  Widget _buildSectionTitle(String title, {double paddingBottom = 10.0}) {
     return Align(
       alignment: Alignment.centerLeft,
       child: Padding(
-        padding: const EdgeInsets.only(bottom: 10.0),
+        padding: EdgeInsets.only(bottom: paddingBottom),
         child: Text(
           title,
           style: const TextStyle(

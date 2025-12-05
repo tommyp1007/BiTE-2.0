@@ -310,114 +310,138 @@ class _TextTranslatorScreenState extends State<TextTranslatorScreen> {
           child: Column(
             children: [
               AppHeader(title: "BiTE Translator"),
+              
+              if (_isLoadingDictionaries)
+                LinearProgressIndicator(color: AppColors.secondary, backgroundColor: AppColors.primary),
+
               Expanded(
                 child: Stack(
                   children: [
-                    Container(
-                      margin: EdgeInsets.only(top: 10),
-                      padding: EdgeInsets.only(bottom: 70),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
-                        boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, -5))],
-                      ),
-                      child: Column(
-                        children: [
-                          Expanded(
-                            flex: 1,
-                            child: Padding(
-                              padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
-                              child: TextField(
-                                controller: _sourceController,
-                                maxLines: null,
-                                expands: true,
-                                style: TextStyle(fontSize: 28, color: Colors.black87, height: 1.3),
-                                decoration: InputDecoration(
-                                  hintText: "Enter text",
-                                  hintStyle: TextStyle(fontSize: 28, color: Colors.grey.shade400),
-                                  border: InputBorder.none,
-                                  contentPadding: EdgeInsets.zero,
-                                ),
-                                onChanged: _onSearchChanged,
-                              ),
-                            ),
-                          ),
-                          if (_isResultVisible && _translatedText.isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 20),
-                              child: Divider(color: Colors.grey.shade300, thickness: 1),
-                            ),
-                          if (_isResultVisible && _translatedText.isNotEmpty)
+                    // --- Main Content Area (Input & Output) ---
+                    // Aligned Top-Center and width constrained for Tablets
+                    Align(
+                      alignment: Alignment.topCenter,
+                      child: Container(
+                        width: double.infinity,
+                        // Constraints ensure it doesn't stretch too wide on iPads/Tablets
+                        constraints: BoxConstraints(maxWidth: 600), 
+                        margin: EdgeInsets.only(top: 10),
+                        padding: EdgeInsets.only(bottom: 70), // Leave space for bottom bar
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+                          boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, -5))],
+                        ),
+                        child: Column(
+                          children: [
+                            // Input Field
                             Expanded(
                               flex: 1,
-                              child: Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.all(24),
-                                child: SingleChildScrollView(
-                                  physics: BouncingScrollPhysics(),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        _toLanguage.toUpperCase(),
-                                        style: TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.2),
-                                      ),
-                                      SizedBox(height: 8),
-                                      Text(
-                                        _translatedText,
-                                        style: TextStyle(fontSize: 28, color: AppColors.primary, fontWeight: FontWeight.w500, height: 1.3),
-                                      ),
-                                    ],
+                              child: Padding(
+                                padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+                                child: TextField(
+                                  controller: _sourceController,
+                                  maxLines: null,
+                                  expands: true,
+                                  style: TextStyle(fontSize: 28, color: Colors.black87, height: 1.3),
+                                  decoration: InputDecoration(
+                                    hintText: "Enter text",
+                                    hintStyle: TextStyle(fontSize: 28, color: Colors.grey.shade400),
+                                    border: InputBorder.none,
+                                    contentPadding: EdgeInsets.zero,
+                                  ),
+                                  onChanged: _onSearchChanged,
+                                ),
+                              ),
+                            ),
+                            
+                            // Divider
+                            if (_isResultVisible && _translatedText.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 20),
+                                child: Divider(color: Colors.grey.shade300, thickness: 1),
+                              ),
+                            
+                            // Output Field
+                            if (_isResultVisible && _translatedText.isNotEmpty)
+                              Expanded(
+                                flex: 1,
+                                child: Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.all(24),
+                                  child: SingleChildScrollView(
+                                    physics: BouncingScrollPhysics(),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          _toLanguage.toUpperCase(),
+                                          style: TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.2),
+                                        ),
+                                        SizedBox(height: 8),
+                                        Text(
+                                          _translatedText,
+                                          style: TextStyle(fontSize: 28, color: AppColors.primary, fontWeight: FontWeight.w500, height: 1.3),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
+
+                    // --- Bottom Language Controls ---
+                    // Fixed to bottom (above keyboard), constrained width
                     Positioned(
                       left: 0,
                       right: 0,
                       bottom: keyboardHeight, 
-                      child: Container(
-                        color: Colors.white,
-                        padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
+                      child: Center(
                         child: Container(
-                          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: AppColors.secondary.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(30),
-                            border: Border.all(color: AppColors.secondary.withOpacity(0.3))
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              _buildLanguageButton(_fromLanguage, (val) {
-                                setState(() => _fromLanguage = val);
-                                if (_sourceController.text.isNotEmpty) _handleTranslate();
-                              }),
-                              IconButton(
-                                icon: Icon(Icons.swap_horiz, color: AppColors.primary, size: 28),
-                                onPressed: _swapLanguages,
-                              ),
-                              _buildLanguageButton(_toLanguage, (val) {
-                                setState(() => _toLanguage = val);
-                                if (_sourceController.text.isNotEmpty) _handleTranslate();
-                              }),
-                              if (isKeyboardOpen)
-                                Container(
-                                  margin: EdgeInsets.only(left: 8),
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey.shade200,
-                                    shape: BoxShape.circle
-                                  ),
-                                  child: IconButton(
-                                    icon: Icon(Icons.keyboard_hide, color: Colors.black54),
-                                    onPressed: () => FocusScope.of(context).unfocus(),
-                                    tooltip: "Hide Keyboard",
-                                  ),
-                                )
-                            ],
+                          width: double.infinity,
+                          constraints: BoxConstraints(maxWidth: 600), // Match the white container width
+                          color: Colors.white, // Background for the bar area
+                          padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
+                          child: Container(
+                            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: AppColors.secondary.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(30),
+                              border: Border.all(color: AppColors.secondary.withOpacity(0.3))
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                _buildLanguageButton(_fromLanguage, (val) {
+                                  setState(() => _fromLanguage = val);
+                                  if (_sourceController.text.isNotEmpty) _handleTranslate();
+                                }),
+                                IconButton(
+                                  icon: Icon(Icons.swap_horiz, color: AppColors.primary, size: 28),
+                                  onPressed: _swapLanguages,
+                                ),
+                                _buildLanguageButton(_toLanguage, (val) {
+                                  setState(() => _toLanguage = val);
+                                  if (_sourceController.text.isNotEmpty) _handleTranslate();
+                                }),
+                                if (isKeyboardOpen)
+                                  Container(
+                                    margin: EdgeInsets.only(left: 8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey.shade200,
+                                      shape: BoxShape.circle
+                                    ),
+                                    child: IconButton(
+                                      icon: Icon(Icons.keyboard_hide, color: Colors.black54),
+                                      onPressed: () => FocusScope.of(context).unfocus(),
+                                      tooltip: "Hide Keyboard",
+                                    ),
+                                  )
+                              ],
+                            ),
                           ),
                         ),
                       ),

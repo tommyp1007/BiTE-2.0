@@ -43,7 +43,7 @@ class _PlayGameScreenState extends State<PlayGameScreen>
   String _hintText = "";
   int _hintUsageCounter = 0; 
   
-  // ⭐ NEW: Track stars earned in this session for display
+  // Track stars earned in this session for display
   int _currentRunStars = 0;
 
   // --- Settings State ---
@@ -314,13 +314,12 @@ class _PlayGameScreenState extends State<PlayGameScreen>
     }
 
     // 2. Fetch current BEST score from storage
-    // (This ensures we don't overwrite a 3-star score with a 1-star score)
     int currentBestStars = await _prefs.getStarsForLevel(_currentLevel);
 
     setState(() {
       _isGameFinished = true;
       _isSuccess = true;
-      _currentRunStars = starsEarned; // Store for display
+      _currentRunStars = starsEarned; 
     });
 
     // 3. Only save if new score is BETTER
@@ -444,9 +443,9 @@ class _PlayGameScreenState extends State<PlayGameScreen>
       body: SafeArea(
         child: Column(
           children: [
-            // --- Top Bar ---
+            // --- FIXED TOP HEADER ---
             Container(
-              padding: EdgeInsets.all(8),
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Row(
                 children: [
                   GestureDetector(
@@ -472,7 +471,7 @@ class _PlayGameScreenState extends State<PlayGameScreen>
                         "Level $_currentLevel",
                         style: TextStyle(
                             color: Colors.white,
-                            fontSize: 20,
+                            fontSize: 22,
                             fontWeight: FontWeight.bold),
                       ),
                       Text(
@@ -480,7 +479,7 @@ class _PlayGameScreenState extends State<PlayGameScreen>
                             ? "Easy"
                             : (_currentLevel <= 10 ? "Medium" : "Hard"),
                         style:
-                            TextStyle(color: Colors.white70, fontSize: 12),
+                            TextStyle(color: Colors.white70, fontSize: 14),
                       ),
                     ],
                   ),
@@ -494,298 +493,290 @@ class _PlayGameScreenState extends State<PlayGameScreen>
               ),
             ),
 
+            // --- SCROLLABLE GAME AREA ---
             Expanded(
-              child: SingleChildScrollView(
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: Column(
-                    children: [
-                      Container(
-                        height: 200,
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius:
-                              BorderRadius.circular(16),
-                          border: Border.all(
-                              color: AppColors.secondary,
-                              width: 3),
-                        ),
-                        child: ClipRRect(
-                          borderRadius:
-                              BorderRadius.circular(13),
-                          child: Image.asset(
-                            _getLevelImage(_currentLevel),
-                            fit: BoxFit.contain,
-                          ),
-                        ),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return SingleChildScrollView(
+                    child: ConstrainedBox(
+                      // Ensure content takes full height to allow centering
+                      constraints: BoxConstraints(
+                        minHeight: constraints.maxHeight,
                       ),
-
-                      SizedBox(height: 16),
-
-                      Container(
-                        padding: EdgeInsets.symmetric(
-                            vertical: 12, horizontal: 20),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius:
-                              BorderRadius.circular(10),
-                        ),
-                        child: Text(
-                          _selectedLetters.isEmpty
-                              ? "..."
-                              : _selectedLetters.join(""),
-                          style: TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                            letterSpacing: 2,
-                          ),
-                        ),
-                      ),
-
-                      SizedBox(height: 10),
-
-                      // ⭐ UPDATE: Result Logic
-                      if (_isGameFinished) ...[
-                        if (_isSuccess)
-                          Column(
+                      child: Center(
+                        // Limit width on large screens
+                        child: Container(
+                          constraints: BoxConstraints(maxWidth: 600),
+                          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Image.asset(
-                                  'assets/images/correct.png',
-                                  height: 40),
-                              Text(
-                                "Correct! Well done.",
-                                style: TextStyle(
-                                  color: Colors.greenAccent,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
+                              SizedBox(height: 10),
+                              
+                              // 1. IMAGE CONTAINER
+                              Container(
+                                height: 200,
+                                width: double.infinity,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                      color: AppColors.secondary, width: 3),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black26, 
+                                      blurRadius: 4, 
+                                      offset: Offset(0, 4)
+                                    )
+                                  ]
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(13),
+                                  child: Image.asset(
+                                    _getLevelImage(_currentLevel),
+                                    fit: BoxFit.contain,
+                                  ),
                                 ),
                               ),
-                              SizedBox(height: 5),
-                              // ⭐ Display Stars Earned Visual
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: List.generate(3, (index) {
-                                  // e.g. if _currentRunStars is 2: 
-                                  // Index 0: < 2 (True) -> Gold
-                                  // Index 1: < 2 (True) -> Gold
-                                  // Index 2: < 2 (False) -> Grey
-                                  return Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                                    child: Icon(
-                                      Icons.star,
-                                      color: index < _currentRunStars 
-                                          ? Colors.amber 
-                                          : Colors.white24,
-                                      size: 32,
-                                      shadows: [
-                                        Shadow(color: Colors.black26, blurRadius: 4, offset: Offset(2,2))
-                                      ],
+
+                              SizedBox(height: 20),
+
+                              // 2. WORD DISPLAY
+                              Container(
+                                width: double.infinity,
+                                padding: EdgeInsets.symmetric(
+                                    vertical: 16, horizontal: 20),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: Colors.white30, width: 1)
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    _selectedLetters.isEmpty
+                                        ? "..."
+                                        : _selectedLetters.join(""),
+                                    style: TextStyle(
+                                      fontSize: 28,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                      letterSpacing: 4,
                                     ),
-                                  );
-                                }),
-                              )
-                            ],
-                          )
-                        else
-                          Column(
-                            children: [
-                              Image.asset(
-                                  'assets/images/wrong.png',
-                                  height: 40),
-                              Text(
-                                "Incorrect! Try again.",
-                                style: TextStyle(
-                                  color: Colors.redAccent,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
+
+                              SizedBox(height: 20),
+
+                              // 3. FEEDBACK / HINT AREA
+                              if (_isGameFinished) ...[
+                                if (_isSuccess)
+                                  Column(
+                                    children: [
+                                      Image.asset(
+                                          'assets/images/correct.png',
+                                          height: 40),
+                                      SizedBox(height: 5),
+                                      Text(
+                                        "Correct! Well done.",
+                                        style: TextStyle(
+                                          color: Colors.greenAccent,
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      SizedBox(height: 5),
+                                      // Star Rating Display
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: List.generate(3, (index) {
+                                          return Padding(
+                                            padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                                            child: Icon(
+                                              Icons.star,
+                                              color: index < _currentRunStars 
+                                                  ? Colors.amber 
+                                                  : Colors.white24,
+                                              size: 32,
+                                              shadows: [
+                                                Shadow(color: Colors.black26, blurRadius: 4, offset: Offset(2,2))
+                                              ],
+                                            ),
+                                          );
+                                        }),
+                                      )
+                                    ],
+                                  )
+                                else
+                                  Column(
+                                    children: [
+                                      Image.asset(
+                                          'assets/images/wrong.png',
+                                          height: 40),
+                                      SizedBox(height: 5),
+                                      Text(
+                                        "Incorrect! Try again.",
+                                        style: TextStyle(
+                                          color: Colors.redAccent,
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  )
+                              ] else ...[
+                                if (_showHint) ...[
+                                  Container(
+                                    padding: EdgeInsets.all(12),
+                                    margin: EdgeInsets.only(bottom: 10),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black26,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                          color: Colors.amber, width: 2),
+                                    ),
+                                    child: Text(
+                                      _hintText,
+                                      style: TextStyle(
+                                        fontSize: 24,
+                                        letterSpacing: 2,
+                                        color: Colors.amberAccent,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  ElevatedButton.icon(
+                                    onPressed: _toggleHint,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.redAccent,
+                                      padding: EdgeInsets.symmetric(
+                                          horizontal: 24, vertical: 12),
+                                      shape: StadiumBorder(),
+                                      elevation: 4,
+                                    ),
+                                    icon: Icon(Icons.close, color: Colors.white, size: 24),
+                                    label: Text(
+                                      "Close Hint",
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                ] else ...[
+                                  // This space is reserved so layout doesn't jump too much
+                                  SizedBox(height: 10),
+                                  ElevatedButton.icon(
+                                    onPressed: _toggleHint,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.amber.shade700,
+                                      foregroundColor: Colors.white,
+                                      padding: EdgeInsets.symmetric(
+                                          horizontal: 24, vertical: 12),
+                                      shape: StadiumBorder(),
+                                      elevation: 5,
+                                    ),
+                                    icon: Icon(Icons.lightbulb,
+                                        size: 22, color: Colors.yellowAccent),
+                                    label: Text(
+                                      "Need a Hint?",
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+
+                              SizedBox(height: 25),
+
+                              // 4. KEYBOARD GRID
+                              GridView.builder(
+                                shrinkWrap: true,
+                                physics: NeverScrollableScrollPhysics(),
+                                gridDelegate:
+                                    SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: 6,
+                                  crossAxisSpacing: 8,
+                                  mainAxisSpacing: 8,
+                                ),
+                                itemCount: _alphabet.length + 1,
+                                itemBuilder: (ctx, i) {
+                                  if (i == _alphabet.length) {
+                                    return _buildKeyBtn("SPC");
+                                  }
+                                  return _buildKeyBtn(_alphabet[i]);
+                                },
+                              ),
+
+                              SizedBox(height: 25),
+
+                              // 5. CONTROL BUTTONS
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: ElevatedButton(
+                                      onPressed: () {
+                                        _triggerVibration();
+                                        if (_isGameFinished && !_isSuccess) {
+                                          setState(() {
+                                            _isGameFinished = false;
+                                            _selectedLetters.clear();
+                                          });
+                                        } else {
+                                          _handleSubmit();
+                                        }
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: AppColors.secondary,
+                                        padding: EdgeInsets.symmetric(vertical: 14),
+                                        shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(12)),
+                                        elevation: 4,
+                                      ),
+                                      child: Text(
+                                        (_isGameFinished && !_isSuccess)
+                                            ? "Retry"
+                                            : buttonText,
+                                        style: TextStyle(
+                                            fontSize: 18, color: Colors.white),
+                                      ),
+                                    ),
+                                  ),
+                                  SizedBox(width: 12),
+                                  GestureDetector(
+                                    onTap: _onBackspace,
+                                    onLongPress: _onClearAll,
+                                    child: Container(
+                                      padding: EdgeInsets.all(14),
+                                      decoration: BoxDecoration(
+                                        color: Colors.redAccent,
+                                        borderRadius: BorderRadius.circular(12),
+                                        boxShadow: [
+                                          BoxShadow(color: Colors.black26, offset: Offset(0,2), blurRadius: 2)
+                                        ]
+                                      ),
+                                      child: Icon(
+                                        Icons.backspace,
+                                        color: Colors.white,
+                                        size: 26,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+
+                              SizedBox(height: 30),
                             ],
-                          )
-                      ] else ...[
-                        if (_showHint) ...[
-                          Container(
-                            padding: EdgeInsets.all(12),
-                            margin:
-                                EdgeInsets.only(bottom: 10),
-                            decoration: BoxDecoration(
-                              color: Colors.black26,
-                              borderRadius:
-                                  BorderRadius.circular(12),
-                              border: Border.all(
-                                  color: Colors.amber,
-                                  width: 2),
-                            ),
-                            child: Text(
-                              _hintText,
-                              style: TextStyle(
-                                fontSize: 24,
-                                letterSpacing: 2,
-                                color: Colors.amberAccent,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
                           ),
-                          ElevatedButton.icon(
-                            onPressed: _toggleHint,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor:
-                                  Colors.redAccent,
-                              padding: EdgeInsets.symmetric(
-                                  horizontal: 24,
-                                  vertical: 12),
-                              shape: StadiumBorder(),
-                              elevation: 4,
-                            ),
-                            icon: Icon(Icons.close,
-                                color: Colors.white,
-                                size: 24),
-                            label: Text(
-                              "Close Hint",
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                        ] else ...[
-                          SizedBox(height: 10),
-                          ElevatedButton.icon(
-                            onPressed: _toggleHint,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor:
-                                  Colors.amber.shade700,
-                              foregroundColor:
-                                  Colors.white,
-                              padding: EdgeInsets.symmetric(
-                                  horizontal: 24,
-                                  vertical: 12),
-                              shape: StadiumBorder(),
-                              elevation: 5,
-                            ),
-                            icon: Icon(Icons.lightbulb,
-                                size: 22,
-                                color: Colors
-                                    .yellowAccent),
-                            label: Text(
-                              "Need a Hint?",
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
-
-                      SizedBox(height: 20),
-
-                      GridView.builder(
-                        shrinkWrap: true,
-                        physics:
-                            NeverScrollableScrollPhysics(),
-                        gridDelegate:
-                            SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 6,
-                          crossAxisSpacing: 5,
-                          mainAxisSpacing: 5,
                         ),
-                        itemCount:
-                            _alphabet.length + 1,
-                        itemBuilder: (ctx, i) {
-                          if (i == _alphabet.length) {
-                            return _buildKeyBtn("SPC");
-                          }
-                          return _buildKeyBtn(
-                              _alphabet[i]);
-                        },
                       ),
-
-                      SizedBox(height: 20),
-
-                      Row(
-                        children: [
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: () {
-                                _triggerVibration();
-                                if (_isGameFinished &&
-                                    !_isSuccess) {
-                                  setState(() {
-                                    _isGameFinished =
-                                        false;
-                                    _selectedLetters
-                                        .clear();
-                                  });
-                                } else {
-                                  _handleSubmit();
-                                }
-                              },
-                              style: ElevatedButton
-                                  .styleFrom(
-                                backgroundColor:
-                                    AppColors
-                                        .secondary,
-                                padding: EdgeInsets
-                                    .symmetric(
-                                        vertical:
-                                            12),
-                                shape: RoundedRectangleBorder(
-                                    borderRadius:
-                                        BorderRadius
-                                            .circular(
-                                                8)),
-                              ),
-                              child: Text(
-                                (_isGameFinished &&
-                                        !_isSuccess)
-                                    ? "Retry"
-                                    : buttonText,
-                                style: TextStyle(
-                                    fontSize: 18,
-                                    color:
-                                        Colors.white),
-                              ),
-                            ),
-                          ),
-                          SizedBox(width: 10),
-                          GestureDetector(
-                            onTap: _onBackspace,
-                            onLongPress:
-                                _onClearAll,
-                            child: Container(
-                              padding:
-                                  EdgeInsets.all(
-                                      12),
-                              decoration:
-                                  BoxDecoration(
-                                color: Colors
-                                    .redAccent,
-                                borderRadius:
-                                    BorderRadius
-                                        .circular(
-                                            8),
-                              ),
-                              child: Icon(
-                                Icons
-                                    .backspace,
-                                color:
-                                    Colors.white,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      SizedBox(height: 20),
-                    ],
-                  ),
-                ),
+                    ),
+                  );
+                },
               ),
             ),
           ],
@@ -804,7 +795,7 @@ class _PlayGameScreenState extends State<PlayGameScreen>
           boxShadow: [
             BoxShadow(
                 color: Colors.black26,
-                offset: Offset(0, 2),
+                offset: Offset(0, 3),
                 blurRadius: 2)
           ],
         ),
@@ -812,7 +803,7 @@ class _PlayGameScreenState extends State<PlayGameScreen>
         child: Text(
           char,
           style: TextStyle(
-            fontSize: char == "SPC" ? 14 : 20,
+            fontSize: char == "SPC" ? 14 : 22,
             fontWeight: FontWeight.bold,
             color: AppColors.primary,
           ),

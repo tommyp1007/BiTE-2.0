@@ -19,34 +19,57 @@ class AppHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // SafeArea ensures we don't draw under the notch/status bar
     return Container(
-      padding: EdgeInsets.only(
-        top: MediaQuery.of(context).padding.top + 10,
-        left: 10,
-        right: 10,
-        bottom: 10,
-      ),
       color: AppColors.primary,
-      child: Row(
-        children: [
-          if (showBackArrow)
-            GestureDetector(
-              onTap: () => Navigator.pop(context),
-              child: Padding(
-                padding: EdgeInsets.all(16),
-                child: Image.asset('assets/images/back_icon.png', width: 40, height: 40),
+      child: SafeArea(
+        bottom: false, // We only care about the top safe area for the header
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+          child: Row(
+            children: [
+              if (showBackArrow)
+                GestureDetector(
+                  onTap: () {
+                    if (Navigator.canPop(context)) {
+                      Navigator.pop(context);
+                    }
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.all(8.0), // Reduced padding slightly for better fit
+                    child: Image.asset(
+                      'assets/images/back_icon.png', 
+                      width: 40, 
+                      height: 40
+                    ),
+                  ),
+                ),
+              
+              Image.asset(
+                'assets/images/bite_icon.png', 
+                width: 50, // Slightly adjusted for better alignment
+                height: 60,
+                fit: BoxFit.contain,
               ),
-            ),
-          Image.asset('assets/images/bite_icon.png', width: 60, height: 70),
-          SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              title,
-              style: TextStyle(color: Colors.white, fontSize: 23, fontWeight: FontWeight.bold),
-            ),
+              
+              const SizedBox(width: 10),
+              
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white, 
+                    fontSize: 22, 
+                    fontWeight: FontWeight.bold
+                  ),
+                  overflow: TextOverflow.ellipsis, // Prevents overflow on small screens
+                ),
+              ),
+              
+              if (trailing != null) trailing!,
+            ],
           ),
-          if (trailing != null) trailing!,
-        ],
+        ),
       ),
     );
   }
@@ -56,20 +79,32 @@ class AppHeader extends StatelessWidget {
 class BottomNavPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    if (Platform.isIOS) return SizedBox.shrink(); // ensure safety, no rendering on iOS
+    // iOS usually relies on swipe gestures or system bars, so we hide this.
+    // If you WANT it on iOS, remove this line.
+    if (Platform.isIOS) return const SizedBox.shrink(); 
 
     return Container(
       color: AppColors.secondary,
       child: SafeArea(
-        top: false,
+        top: false, // Only care about bottom safe area (home indicator)
         child: Container(
-          padding: EdgeInsets.symmetric(vertical: 15),
+          height: 70, // Fixed height for consistency
+          padding: const EdgeInsets.symmetric(vertical: 10),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly, // Better spacing
             children: [
+              // Home Button
               Expanded(
-                child: GestureDetector(
+                child: InkWell(
                   onTap: () {
+                    // Check if we are already on HomeScreen to avoid duplicate push
+                    // We use ModalRoute to check the runtime type of the current page
+                    final currentRoute = ModalRoute.of(context);
+                    bool isAlreadyHome = currentRoute?.settings.name == '/' || 
+                                         currentRoute?.settings.name == 'HomeScreen';
+                    
+                    // If your routing isn't named, we just pushAndRemoveUntil 
+                    // which is the safest "Reset to Home" method.
                     Navigator.pushAndRemoveUntil(
                       context,
                       MaterialPageRoute(builder: (_) => HomeScreen()),
@@ -77,25 +112,50 @@ class BottomNavPanel extends StatelessWidget {
                     );
                   },
                   child: Column(
-                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Image.asset('assets/images/home_page.png', width: 40, height: 40),
-                      SizedBox(height: 4),
-                      Text("Home", style: TextStyle(color: Colors.white, fontSize: 14)),
+                      Image.asset(
+                        'assets/images/home_page.png', 
+                        width: 30, 
+                        height: 30
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        "Home", 
+                        style: TextStyle(color: Colors.white, fontSize: 12)
+                      ),
                     ],
                   ),
                 ),
               ),
 
+              // Vertical Divider for visual separation
+              Container(
+                width: 1, 
+                height: 40, 
+                color: Colors.white24
+              ),
+
+              // Exit Button
               Expanded(
-                child: GestureDetector(
-                  onTap: () => SystemNavigator.pop(),
+                child: InkWell(
+                  onTap: () {
+                    // SystemNavigator.pop() minimizes the app on Android
+                    SystemNavigator.pop();
+                  },
                   child: Column(
-                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Image.asset('assets/images/exit_icon.png', width: 40, height: 40),
-                      SizedBox(height: 4),
-                      Text("Exit", style: TextStyle(color: Colors.white, fontSize: 14)),
+                      Image.asset(
+                        'assets/images/exit_icon.png', 
+                        width: 30, 
+                        height: 30
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        "Exit", 
+                        style: TextStyle(color: Colors.white, fontSize: 12)
+                      ),
                     ],
                   ),
                 ),

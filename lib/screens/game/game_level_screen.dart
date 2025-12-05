@@ -75,7 +75,6 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
     }
 
     // ⭐ SAFETY FIX: If the game was reset (Level 1), force Difficulty to Easy.
-    // This prevents being stuck on "Hard" screen with all levels locked.
     if (loadedUnlockedLevel == 1) {
       loadedDifficulty = "easy";
     }
@@ -131,7 +130,7 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
     return Scaffold(
       // Ensure bottom bar stays put
       bottomNavigationBar: BottomNavPanel(),
-      resizeToAvoidBottomInset: false, // Prevents squashing when keyboard/other UI appears
+      resizeToAvoidBottomInset: false,
       
       body: Container(
         width: double.infinity,
@@ -143,134 +142,157 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
             colors: [Color(0xFF87CEEB), Color(0xFFADD8E6), Color(0xFFE0F7FA)],
           ),
         ),
-        child: SafeArea(
-          bottom: false,
-          child: Column(
-            children: [
-              // ---------- HEADER ----------
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    GestureDetector(
-                      behavior: HitTestBehavior.opaque, // Ensures click is registered
-                      onTap: () {
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(builder: (_) => WordGuessEntryScreen()),
-                        );
-                      },
-                      child: Image.asset('assets/images/back_icon.png', width: 40),
-                    ),
-                    Column(
-                      children: [
-                        const Text(
-                          "SELECT LEVEL",
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 32,
-                            fontWeight: FontWeight.bold,
-                            shadows: [
-                              Shadow(color: Colors.blue, offset: Offset(2, 2), blurRadius: 4)
-                            ],
-                          ),
-                        ),
-                        Text(
-                          "${_difficulty.toUpperCase()} MODE",
-                          style: TextStyle(
-                            color: _getDifficultyColor(),
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            shadows: const [
-                              Shadow(color: Colors.white, offset: Offset(0, 1), blurRadius: 1),
-                              Shadow(color: Colors.black12, offset: Offset(1, 1), blurRadius: 2),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.settings, color: Colors.white, size: 30),
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const GameSettingsScreen()),
-                        );
-                      },
-                    ),
-                  ],
-                ),
-              ),
+        // LayoutBuilder is key for responsive design
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SafeArea(
+              bottom: false, // BottomNav handles the bottom safe area
+              child: SingleChildScrollView(
+                child: ConstrainedBox(
+                  // Forces the content to be at least as tall as the screen
+                  // This allows us to use MainAxisAlignment.spaceBetween
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                  child: Center(
+                    // Constrain width for Tablets/iPads
+                    child: Container(
+                      constraints: BoxConstraints(maxWidth: 600),
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      child: IntrinsicHeight(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            // ---------- HEADER ----------
+                            Padding(
+                              padding: const EdgeInsets.only(top: 10),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  GestureDetector(
+                                    behavior: HitTestBehavior.opaque,
+                                    onTap: () {
+                                      Navigator.pushReplacement(
+                                        context,
+                                        MaterialPageRoute(builder: (_) => WordGuessEntryScreen()),
+                                      );
+                                    },
+                                    child: Image.asset('assets/images/back_icon.png', width: 40),
+                                  ),
+                                  Expanded(
+                                    child: Column(
+                                      children: [
+                                        FittedBox(
+                                          fit: BoxFit.scaleDown,
+                                          child: Text(
+                                            "SELECT LEVEL",
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 32,
+                                              fontWeight: FontWeight.bold,
+                                              shadows: [
+                                                Shadow(color: Colors.blue, offset: Offset(2, 2), blurRadius: 4)
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                        Text(
+                                          "${_difficulty.toUpperCase()} MODE",
+                                          style: TextStyle(
+                                            color: _getDifficultyColor(),
+                                            fontSize: 24,
+                                            fontWeight: FontWeight.bold,
+                                            shadows: const [
+                                              Shadow(color: Colors.white, offset: Offset(0, 1), blurRadius: 1),
+                                              Shadow(color: Colors.black12, offset: Offset(1, 1), blurRadius: 2),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.settings, color: Colors.white, size: 30),
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(builder: (_) => const GameSettingsScreen()),
+                                      );
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
 
-              // ---------- LEVEL GRID ----------
-              // Expanded ensures it takes remaining space, Center keeps it middle
-              Expanded(
-                child: Center(
-                  child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(), // Better touch feel
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            _buildLevelButton(levels[0]),
-                            const SizedBox(width: 40),
-                            _buildLevelButton(levels[1]),
+                            // ---------- LEVEL GRID (Centered vertically) ----------
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 20),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      _buildLevelButton(levels[0]),
+                                      const SizedBox(width: 30), // Responsive gap
+                                      _buildLevelButton(levels[1]),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 30),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      _buildLevelButton(levels[2]),
+                                      const SizedBox(width: 30),
+                                      _buildLevelButton(levels[3]),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 30),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      _buildLevelButton(levels[4]),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            // ---------- DIFFICULTY NAV ----------
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  _buildNavArrow(
+                                    Icons.arrow_back,
+                                    _difficulty == 'easy'
+                                        ? null
+                                        : () {
+                                            if (_difficulty == 'medium') _updateDifficulty('easy');
+                                            else if (_difficulty == 'hard') _updateDifficulty('medium');
+                                          },
+                                  ),
+                                  _buildNavArrow(
+                                    Icons.arrow_forward,
+                                    _difficulty == 'hard'
+                                        ? null
+                                        : () {
+                                            if (_difficulty == 'easy') _updateDifficulty('medium');
+                                            else if (_difficulty == 'medium') _updateDifficulty('hard');
+                                          },
+                                  ),
+                                ],
+                              ),
+                            ),
                           ],
                         ),
-                        const SizedBox(height: 30),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            _buildLevelButton(levels[2]),
-                            const SizedBox(width: 40),
-                            _buildLevelButton(levels[3]),
-                          ],
-                        ),
-                        const SizedBox(height: 30),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            _buildLevelButton(levels[4]),
-                          ],
-                        ),
-                      ],
+                      ),
                     ),
                   ),
                 ),
               ),
-
-              // ---------- DIFFICULTY NAV ----------
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 20),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _buildNavArrow(
-                      Icons.arrow_back,
-                      _difficulty == 'easy'
-                          ? null
-                          : () {
-                              if (_difficulty == 'medium') _updateDifficulty('easy');
-                              else if (_difficulty == 'hard') _updateDifficulty('medium');
-                            },
-                    ),
-                    _buildNavArrow(
-                      Icons.arrow_forward,
-                      _difficulty == 'hard'
-                          ? null
-                          : () {
-                              if (_difficulty == 'easy') _updateDifficulty('medium');
-                              else if (_difficulty == 'medium') _updateDifficulty('hard');
-                            },
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );
@@ -282,7 +304,7 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
     int starsEarned = _levelStars[level] ?? 0;
 
     return GestureDetector(
-      behavior: HitTestBehavior.opaque, // CRITICAL for touch responsiveness
+      behavior: HitTestBehavior.opaque,
       onTap: () {
         if (isLocked) {
           ScaffoldMessenger.of(context).hideCurrentSnackBar();
@@ -301,8 +323,9 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
         }
       },
       child: Container(
-        width: 100,
-        height: 100,
+        // Slightly reduced fixed size to fit smaller screens better
+        width: 90, 
+        height: 90,
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: isLocked
@@ -312,9 +335,9 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
             end: Alignment.bottomRight,
           ),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFF2E6DA4), width: 4),
+          border: Border.all(color: const Color(0xFF2E6DA4), width: 3),
           boxShadow: const [
-            BoxShadow(color: Colors.black26, offset: Offset(4, 6), blurRadius: 6)
+            BoxShadow(color: Colors.black26, offset: Offset(3, 5), blurRadius: 5)
           ],
         ),
         child: Stack(
@@ -329,20 +352,20 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
                     (index) => Icon(
                       Icons.star,
                       color: index < starsEarned ? Colors.amber : Colors.black26,
-                      size: 16,
+                      size: 14,
                     ),
                   ),
                 ),
               ),
             isLocked
-                ? const Icon(Icons.lock, color: Colors.white70, size: 40)
+                ? const Icon(Icons.lock, color: Colors.white70, size: 35)
                 : Padding(
                     padding: const EdgeInsets.only(top: 12.0),
                     child: Text(
                       "$level",
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 40,
+                        fontSize: 36,
                         fontWeight: FontWeight.bold,
                         shadows: [
                           Shadow(
@@ -366,15 +389,16 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(10),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: isDisabled ? Colors.grey : Colors.red,
+          color: isDisabled ? Colors.grey.withOpacity(0.5) : Colors.red,
           shape: BoxShape.circle,
-          boxShadow: const [
-            BoxShadow(color: Colors.black26, offset: Offset(2, 4), blurRadius: 4)
+          boxShadow: [
+            if (!isDisabled)
+              BoxShadow(color: Colors.black26, offset: Offset(2, 4), blurRadius: 4)
           ],
         ),
-        child: Icon(icon, color: Colors.white, size: 36),
+        child: Icon(icon, color: Colors.white, size: 32),
       ),
     );
   }

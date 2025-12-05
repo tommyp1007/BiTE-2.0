@@ -100,14 +100,15 @@ class _GameOverScreenState extends State<GameOverScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // --- UPDATED HEADER (Centered Title) ---
+            // --- HEADER ---
+            // Stays fixed at the top
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               color: AppColors.primary,
               child: Stack(
-                alignment: Alignment.center, // This ensures the Title/Icon is dead center
+                alignment: Alignment.center,
                 children: [
-                  // 1. Back Button (Aligned to the Left)
+                  // Back Button
                   Align(
                     alignment: Alignment.centerLeft,
                     child: GestureDetector(
@@ -116,14 +117,14 @@ class _GameOverScreenState extends State<GameOverScreen> {
                     ),
                   ),
 
-                  // 2. Title & Icon (Centered in the Stack)
+                  // Title & Icon
                   Row(
-                    mainAxisSize: MainAxisSize.min, // Shrink row to fit content
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Image.asset(
                         'assets/images/bite_icon.png', 
-                        width: 60, 
-                        height: 70, 
+                        width: 50, 
+                        height: 50, 
                         fit: BoxFit.contain
                       ),
                       const SizedBox(width: 8),
@@ -131,7 +132,7 @@ class _GameOverScreenState extends State<GameOverScreen> {
                         "BiTE Translator",
                         style: TextStyle(
                           color: Colors.white, 
-                          fontSize: 23, 
+                          fontSize: 22, 
                           fontWeight: FontWeight.bold
                         ),
                       ),
@@ -141,60 +142,84 @@ class _GameOverScreenState extends State<GameOverScreen> {
               ),
             ),
 
-            // --- Main Content (Trophy & Text) ---
+            // --- MAIN CONTENT ---
+            // Takes up remaining space but handles scrolling/centering responsive logic
             Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // Trophy Image
-                    Expanded(
-                      child: Center(
-                        child: Image.asset('assets/images/trophy.png', width: 300, height: 300),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return SingleChildScrollView(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minHeight: constraints.maxHeight,
                       ),
-                    ),
-                    
-                    // Congratulation Text
-                    Text(
-                      "Congratulations!\nYou've completed the $diffMode Mode!", 
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)
-                    ),
-                    SizedBox(height: 30),
-                    
-                    // --- Buttons ---
-                    if (!isLastLevel)
-                      SizedBox(
-                        width: double.infinity,
-                        height: 50,
-                        child: ElevatedButton(
-                          onPressed: _handleNextLevel, 
-                          child: Text("Next Level Mode", style: TextStyle(fontSize: 18, color: Colors.white)),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.secondary,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      child: Center(
+                        // Constrain width for tablets/desktop
+                        child: Container(
+                          constraints: BoxConstraints(maxWidth: 500),
+                          padding: const EdgeInsets.all(24.0),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              // Trophy Image
+                              Image.asset(
+                                'assets/images/trophy.png', 
+                                width: 280, 
+                                height: 280,
+                                fit: BoxFit.contain,
+                              ),
+                              
+                              SizedBox(height: 30),
+
+                              // Congratulation Text
+                              Text(
+                                "Congratulations!\nYou've completed the $diffMode Mode!", 
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Colors.white, 
+                                  fontSize: 26, 
+                                  fontWeight: FontWeight.bold,
+                                  height: 1.2
+                                )
+                              ),
+                              
+                              SizedBox(height: 40),
+                              
+                              // --- Buttons ---
+                              if (!isLastLevel)
+                                ElevatedButton(
+                                  onPressed: _handleNextLevel, 
+                                  child: Text("Next Level Mode", style: TextStyle(fontSize: 18, color: Colors.white)),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.secondary,
+                                    minimumSize: Size(double.infinity, 55),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    elevation: 4,
+                                  ),
+                                ),
+                              
+                              if (!isLastLevel)
+                                SizedBox(height: 16),
+                              
+                              ElevatedButton(
+                                onPressed: _handleExit, 
+                                child: Text("Return", style: TextStyle(fontSize: 18, color: Colors.white)),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.secondary,
+                                  minimumSize: Size(double.infinity, 55),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  elevation: 4,
+                                ),
+                              ),
+                              
+                              // Bottom spacer to ensure scrolling creates space at end
+                              SizedBox(height: 20),
+                            ],
                           ),
                         ),
                       ),
-                    
-                    SizedBox(height: 16),
-                    
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton(
-                        onPressed: _handleExit, 
-                        child: Text("Return", style: TextStyle(fontSize: 18, color: Colors.white)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.secondary,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
-                      ),
                     ),
-                    SizedBox(height: 40),
-                  ],
-                ),
+                  );
+                },
               ),
             ),
           ],

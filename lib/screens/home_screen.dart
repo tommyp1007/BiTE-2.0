@@ -108,6 +108,62 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  // Custom Button Widget for consistent look
+  Widget _buildAuthButton(bool isGuest, VoidCallback onTap) {
+    final Color btnColor = const Color(0xFFA0522D); 
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 38,
+        width: 110,
+        decoration: BoxDecoration(
+          color: btnColor,
+          borderRadius: BorderRadius.circular(30),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black26,
+              offset: Offset(0, 2),
+              blurRadius: 2,
+            )
+          ],
+        ),
+        child: Container(
+          margin: const EdgeInsets.all(2), // White border gap
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.white, width: 1.5),
+            borderRadius: BorderRadius.circular(28),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                isGuest ? "Sign In" : "Sign Out",
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+              if (isGuest)
+                Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.person, size: 14, color: btnColor),
+                )
+              else
+                const Icon(Icons.logout, size: 16, color: Colors.white),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final bool isiOS = Platform.isIOS;
@@ -119,138 +175,166 @@ class _HomeScreenState extends State<HomeScreen> {
         bottom: false,
         child: Column(
           children: [
-            // ------------------- TOP HEADER (Stays at Top) -------------------
+            // ------------------- TOP HEADER -------------------
             Container(
-              padding: EdgeInsets.all(10),
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Row(
                 children: [
-                  Image.asset('assets/images/bite_icon.png', width: 60, height: 60),
-                  SizedBox(width: 8),
+                  Image.asset('assets/images/bite_icon.png', width: 50, height: 50),
+                  SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       "BiTE Translator",
-                      style: TextStyle(color: Colors.white, fontSize: 23, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        color: Colors.white, 
+                        fontSize: 22, 
+                        fontWeight: FontWeight.bold
+                      ),
                     ),
                   ),
-                  GestureDetector(
-                    onTap: _handleGuestLoginButton,
-                    child: Image.asset(
-                      isInGuestMode
-                          ? 'assets/images/loginbutton.png'
-                          : 'assets/images/logoutbutton.png',
-                      width: 120,
-                      height: 40,
-                    ),
-                  ),
+                  _buildAuthButton(isInGuestMode, _handleGuestLoginButton),
                 ],
               ),
             ),
 
-            // ------------------- MIDDLE SECTION (Centered Vertically) -------------------
+            // ------------------- MIDDLE SECTION -------------------
             Expanded(
-              child: Center(
-                // SingleChildScrollView prevents overflow on small screens/landscape
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      // User Icon
-                      GestureDetector(
-                        onTap: () {
-                          if (isInGuestMode) _promptSignIn();
-                          else {
-                            Navigator.push(context,
-                              MaterialPageRoute(builder: (_) => ProfileEditScreen()));
-                          }
-                        },
-                        child: Image.asset('assets/images/user_icon.png',
-                            width: 65, height: 65),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return SingleChildScrollView(
+                    child: ConstrainedBox(
+                      // Ensures content takes full available height for centering
+                      constraints: BoxConstraints(
+                        minHeight: constraints.maxHeight,
                       ),
-
-                      SizedBox(height: 10),
-
-                      // Welcome Text
-                      GestureDetector(
-                        onTap: () {
-                          if (isInGuestMode) _promptSignIn();
-                          else {
-                            Navigator.push(context,
-                              MaterialPageRoute(builder: (_) => ProfileEditScreen()));
-                          }
-                        },
-                        child: Text(
-                          welcomeText,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-
-                      SizedBox(height: 20),
-
-                      // Grid Items
-                      ConstrainedBox(
-                        constraints: BoxConstraints(maxWidth: 500),
-                        child: GridView.builder(
-                          padding: EdgeInsets.symmetric(horizontal: 16),
-                          shrinkWrap: true, // Crucial for nesting inside Center/Column
-                          physics: NeverScrollableScrollPhysics(), // Disables internal grid scrolling
-                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            crossAxisSpacing: 16,
-                            mainAxisSpacing: 16,
-                            childAspectRatio: 1.0,
-                          ),
-                          itemCount: _gridItems.length,
-                          itemBuilder: (context, index) {
-                            final item = _gridItems[index];
-                            return Card(
-                              color: AppColors.secondary,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: InkWell(
-                                onTap: () => _handleGridClick(item['title'], item['page']),
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Image.asset(
-                                      'assets/images/${item['img']}',
-                                      width: 60,
-                                      height: 60,
-                                    ),
-                                    SizedBox(height: 12),
-                                    Text(
-                                      item['title'],
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
+                      child: Center(
+                        // Limits width on Tablets/Desktop
+                        child: Container(
+                          constraints: BoxConstraints(maxWidth: 500),
+                          padding: EdgeInsets.symmetric(horizontal: 24),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              
+                              // User Icon
+                              GestureDetector(
+                                onTap: () {
+                                  if (isInGuestMode) _promptSignIn();
+                                  else {
+                                    Navigator.push(context,
+                                      MaterialPageRoute(builder: (_) => ProfileEditScreen()));
+                                  }
+                                },
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    boxShadow: [
+                                      BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 4))
+                                    ]
+                                  ),
+                                  child: Image.asset('assets/images/user_icon.png', width: 80, height: 80),
                                 ),
                               ),
-                            );
-                          },
+
+                              SizedBox(height: 16),
+
+                              // Welcome Text
+                              GestureDetector(
+                                onTap: () {
+                                  if (isInGuestMode) _promptSignIn();
+                                  else {
+                                    Navigator.push(context,
+                                      MaterialPageRoute(builder: (_) => ProfileEditScreen()));
+                                  }
+                                },
+                                child: Text(
+                                  welcomeText,
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
+                                    shadows: [
+                                      Shadow(color: Colors.black12, offset: Offset(0, 2), blurRadius: 4)
+                                    ]
+                                  ),
+                                ),
+                              ),
+
+                              SizedBox(height: 30),
+
+                              // Grid Items
+                              GridView.builder(
+                                shrinkWrap: true, // Necessary inside ScrollView
+                                physics: NeverScrollableScrollPhysics(),
+                                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: 2,
+                                  crossAxisSpacing: 20,
+                                  mainAxisSpacing: 20,
+                                  childAspectRatio: 1.0,
+                                ),
+                                itemCount: _gridItems.length,
+                                itemBuilder: (context, index) {
+                                  final item = _gridItems[index];
+                                  return Card(
+                                    color: AppColors.secondary,
+                                    elevation: 6,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: InkWell(
+                                      onTap: () => _handleGridClick(item['title'], item['page']),
+                                      borderRadius: BorderRadius.circular(20),
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Image.asset(
+                                            'assets/images/${item['img']}',
+                                            width: 65,
+                                            height: 65,
+                                            fit: BoxFit.contain,
+                                          ),
+                                          SizedBox(height: 12),
+                                          Padding(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                                            child: Text(
+                                              item['title'],
+                                              textAlign: TextAlign.center,
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 15,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                              
+                              // Extra spacing at bottom of scrollable area
+                              SizedBox(height: 20),
+                            ],
+                          ),
                         ),
                       ),
-                    ],
-                  ),
-                ),
+                    ),
+                  );
+                },
               ),
             ),
 
-            // ------------------- BOTTOM TRADEMARK (Stays at Bottom) -------------------
+            // ------------------- BOTTOM TRADEMARK -------------------
             Padding(
-              padding: EdgeInsets.only(bottom: isiOS ? 16 : 8, top: 10),
-              child: Text(
-                "Developed by: TOMMY ANAK PEYEI",
-                style: TextStyle(color: Colors.white, fontSize: 12),
+              padding: EdgeInsets.only(bottom: isiOS ? 20 : 10, top: 10),
+              child: Opacity(
+                opacity: 0.8,
+                child: Text(
+                  "Developed by: TOMMY ANAK PEYEI",
+                  style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500),
+                ),
               ),
             ),
           ],

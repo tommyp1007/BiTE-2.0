@@ -72,7 +72,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
         await _saveUserInfo(cred.user!.uid, firstName, lastName, username, phone, email);
         
         // --- AUTOFILL TRIGGER ---
-        // Explicitly tell the OS we finished a sign-up form so it can save the NEW credentials
         TextInput.finishAutofillContext(shouldSave: true); 
         // ------------------------
       }
@@ -137,76 +136,117 @@ class _SignUpScreenState extends State<SignUpScreen> {
     return Scaffold(
       backgroundColor: AppColors.primary,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20.0),
-          // AutofillGroup for Sign Up form
-          child: AutofillGroup(
-            onDisposeAction: AutofillContextAction.commit,
-            child: Column(
-              children: [
-                Align(
-                  alignment: Alignment.topLeft,
-                  child: GestureDetector(
-                    onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => SignInScreen())), 
-                    child: Padding(
-                      padding: const EdgeInsets.only(left: 16.0, top: 16.0, bottom: 10.0),
-                      child: Image.asset('assets/images/back_icon.png', width: 40, height: 40),
+        // LayoutBuilder ensures we know the screen height for centering logic
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+              child: ConstrainedBox(
+                // Forces the content to be at least as tall as the screen
+                // This makes 'Center' work, but allows scrolling if content overflows
+                constraints: BoxConstraints(
+                  minHeight: constraints.maxHeight,
+                ),
+                child: Center(
+                  // Limits width on large devices (Tablets/Landscape)
+                  child: Container(
+                    constraints: BoxConstraints(maxWidth: 500),
+                    child: IntrinsicHeight(
+                      child: AutofillGroup(
+                        onDisposeAction: AutofillContextAction.commit,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            // Back Button
+                            Align(
+                              alignment: Alignment.topLeft,
+                              child: Padding(
+                                padding: const EdgeInsets.only(top: 10, bottom: 10),
+                                child: GestureDetector(
+                                  onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => SignInScreen())), 
+                                  child: Image.asset(
+                                    'assets/images/back_icon.png', 
+                                    width: 40, 
+                                    height: 40
+                                  ),
+                                ),
+                              ),
+                            ),
+                          
+                            Image.asset('assets/images/bite_icon.png', width: 100, height: 100),
+                            SizedBox(height: 10),
+                            
+                            Text(
+                              "Sign Up", 
+                              style: TextStyle(
+                                fontSize: 30, // Slightly larger for better hierarchy
+                                fontWeight: FontWeight.bold, 
+                                color: AppColors.white
+                              )
+                            ),
+                            
+                            SizedBox(height: 20),
+
+                            _buildInput("First Name", _firstNameCtrl, autofillHints: [AutofillHints.givenName]),
+                            _buildInput("Last Name", _lastNameCtrl, autofillHints: [AutofillHints.familyName]),
+                            _buildInput("Username", _usernameCtrl, autofillHints: [AutofillHints.username]),
+                            _buildInput("Email", _emailCtrl, isEmail: true, autofillHints: [AutofillHints.email]),
+                            _buildInput("Phone Number", _phoneCtrl, isPhone: true, autofillHints: [AutofillHints.telephoneNumber]),
+                            
+                            _buildInput(
+                              "Password", 
+                              _passwordCtrl, 
+                              isPassword: true,
+                              isVisible: _isPasswordVisible,
+                              onVisibilityToggle: () {
+                                setState(() {
+                                  _isPasswordVisible = !_isPasswordVisible;
+                                });
+                              },
+                              autofillHints: [AutofillHints.newPassword] 
+                            ),
+
+                            _buildInput(
+                              "Confirm Password", 
+                              _confirmCtrl, 
+                              isPassword: true,
+                              isVisible: _isConfirmVisible,
+                              onVisibilityToggle: () {
+                                setState(() {
+                                  _isConfirmVisible = !_isConfirmVisible;
+                                });
+                              },
+                              autofillHints: [AutofillHints.newPassword]
+                            ),
+                            
+                            SizedBox(height: 30),
+                            
+                            if (_isLoading) 
+                              CircularProgressIndicator(color: AppColors.white) 
+                            else
+                              ElevatedButton(
+                                onPressed: _handleSignUp,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.secondary,
+                                  minimumSize: Size(double.infinity, 55),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8)
+                                  )
+                                ),
+                                child: Text("Sign Up", style: TextStyle(fontSize: 18, color: AppColors.white)),
+                              ),
+
+                            // Extra bottom padding so it doesn't touch the screen edge on scroll
+                            SizedBox(height: 40),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ),
-            
-                Image.asset('assets/images/bite_icon.png', width: 100, height: 100),
-                SizedBox(height: 10),
-                Text("Sign Up", style: TextStyle(fontSize: 25, fontWeight: FontWeight.bold, color: AppColors.white)),
-                
-                SizedBox(height: 10),
-                _buildInput("First Name", _firstNameCtrl, autofillHints: [AutofillHints.givenName]),
-                _buildInput("Last Name", _lastNameCtrl, autofillHints: [AutofillHints.familyName]),
-                _buildInput("Username", _usernameCtrl, autofillHints: [AutofillHints.username]),
-                _buildInput("Email", _emailCtrl, isEmail: true, autofillHints: [AutofillHints.email]),
-                _buildInput("Phone Number", _phoneCtrl, isPhone: true, autofillHints: [AutofillHints.telephoneNumber]),
-                
-                // IMPORTANT: Use AutofillHints.newPassword here for sign up
-                _buildInput(
-                  "Password", 
-                  _passwordCtrl, 
-                  isPassword: true,
-                  isVisible: _isPasswordVisible,
-                  onVisibilityToggle: () {
-                    setState(() {
-                      _isPasswordVisible = !_isPasswordVisible;
-                    });
-                  },
-                  autofillHints: [AutofillHints.newPassword] 
-                ),
-
-                _buildInput(
-                  "Confirm Password", 
-                  _confirmCtrl, 
-                  isPassword: true,
-                  isVisible: _isConfirmVisible,
-                  onVisibilityToggle: () {
-                    setState(() {
-                      _isConfirmVisible = !_isConfirmVisible;
-                    });
-                  },
-                  autofillHints: [AutofillHints.newPassword]
-                ),
-                
-                SizedBox(height: 20),
-                _isLoading 
-                  ? CircularProgressIndicator(color: AppColors.white) 
-                  : ElevatedButton(
-                      onPressed: _handleSignUp,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.secondary,
-                        minimumSize: Size(double.infinity, 50)
-                      ),
-                      child: Text("Sign Up", style: TextStyle(fontSize: 18, color: AppColors.white)),
-                    ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -224,7 +264,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
       Iterable<String>? autofillHints
     }) {
     return Padding(
-      padding: const EdgeInsets.only(top: 10.0),
+      padding: const EdgeInsets.only(top: 15.0), // Increased spacing slightly
       child: TextField(
         controller: ctrl,
         obscureText: isPassword ? !isVisible : false,
@@ -235,9 +275,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
           hintText: hint,
           filled: true,
           fillColor: AppColors.white,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(5)),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide.none
+          ),
           hintStyle: TextStyle(color: Colors.grey),
-          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16), // Comfortable touch target
           suffixIcon: isPassword 
             ? IconButton(
                 icon: Icon(

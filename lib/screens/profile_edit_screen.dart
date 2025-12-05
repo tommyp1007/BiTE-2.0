@@ -99,7 +99,6 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
             await user!.updatePassword(newPassword);
             
             // --- AUTOFILL TRIGGER ---
-            // Password Updated - Tell OS to update the saved credential
             TextInput.finishAutofillContext(shouldSave: true);
             
             await _updateUserProfile(firstName, lastName, username, email, phone);
@@ -181,113 +180,146 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       child: Scaffold(
         backgroundColor: AppColors.primary,
         body: SafeArea(
-          child: Column(
-            children: [
-              Align(
-                alignment: Alignment.topLeft,
-                child: GestureDetector(
-                  onTap: _navigateToHome, 
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Image.asset('assets/images/back_icon.png', width: 40, height: 40),
-                  ),
-                ),
-              ),
-
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: EdgeInsets.symmetric(horizontal: 20),
-                  // AutofillGroup for Edit Profile
-                  child: AutofillGroup(
-                    onDisposeAction: AutofillContextAction.commit,
-                    child: Column(
-                      children: [
-                        Image.asset('assets/images/edit_user.png', width: 70, height: 70),
-                        SizedBox(height: 10),
-                        Text("Edit Profile", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
-                        SizedBox(height: 20),
-
-                        _buildField("First Name", _firstNameCtrl, autofillHints: [AutofillHints.givenName]),
-                        _buildField("Last Name", _lastNameCtrl, autofillHints: [AutofillHints.familyName]),
-                        _buildField("Username", _usernameCtrl, autofillHints: [AutofillHints.username]),
-                        _buildField("Email", _emailCtrl, isEmail: true, autofillHints: [AutofillHints.email]),
-                        _buildField("Phone Number", _phoneCtrl, isPhone: true, autofillHints: [AutofillHints.telephoneNumber]),
-                        
-                        Divider(color: Colors.white54),
-                        SizedBox(height: 10),
-                        Text("Change Password (Optional)", style: TextStyle(color: Colors.white70)),
-                        SizedBox(height: 10),
-
-                        _buildField(
-                          "Current Password", 
-                          _currentPasswordCtrl, 
-                          isPassword: true,
-                          isVisible: _isCurrentVisible,
-                          onVisibilityToggle: () {
-                             setState(() => _isCurrentVisible = !_isCurrentVisible);
-                          },
-                          // This is the password for the EXISTING account
-                          autofillHints: [AutofillHints.password]
-                        ),
-                        
-                        _buildField(
-                          "New Password", 
-                          _newPasswordCtrl, 
-                          isPassword: true,
-                          isVisible: _isNewVisible,
-                          onVisibilityToggle: () {
-                             setState(() => _isNewVisible = !_isNewVisible);
-                          },
-                          // This suggests we are setting a NEW password
-                          autofillHints: [AutofillHints.newPassword]
-                        ),
-                        
-                        _buildField(
-                          "Confirm Password", 
-                          _confirmPasswordCtrl, 
-                          isPassword: true,
-                          isVisible: _isConfirmVisible,
-                          onVisibilityToggle: () {
-                             setState(() => _isConfirmVisible = !_isConfirmVisible);
-                          },
-                          autofillHints: [AutofillHints.newPassword]
-                        ),
-
-                        SizedBox(height: 20),
-                        _isLoading
-                            ? CircularProgressIndicator(color: Colors.white)
-                            : ElevatedButton(
-                                onPressed: _saveProfileChanges,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.secondary,
-                                  minimumSize: Size(double.infinity, 50),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                child: ConstrainedBox(
+                  // Ensure the content is at least as tall as the screen
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                  child: Center(
+                    // Limit width on Tablets/Desktop so fields don't stretch too wide
+                    child: Container(
+                      constraints: BoxConstraints(maxWidth: 600),
+                      child: AutofillGroup(
+                        onDisposeAction: AutofillContextAction.commit,
+                        child: Column(
+                          children: [
+                            // --- Back Button ---
+                            Align(
+                              alignment: Alignment.topLeft,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                child: GestureDetector(
+                                  onTap: _navigateToHome, 
+                                  child: Image.asset('assets/images/back_icon.png', width: 40, height: 40),
                                 ),
-                                child: Text("Update Profile", style: TextStyle(color: Colors.white)),
                               ),
+                            ),
 
-                        SizedBox(height: 10),
-                        ElevatedButton(
-                          onPressed: () async {
-                            await FirebaseAuth.instance.signOut();
-                            Navigator.pushAndRemoveUntil(
-                              context,
-                              MaterialPageRoute(builder: (_) => SignInScreen()),
-                              (route) => false,
-                            );
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.secondary,
-                            minimumSize: Size(double.infinity, 50),
-                          ),
-                          child: Text("Logout", style: TextStyle(color: Colors.white)),
+                            // --- Header ---
+                            Image.asset('assets/images/edit_user.png', width: 80, height: 80),
+                            SizedBox(height: 10),
+                            Text(
+                              "Edit Profile", 
+                              style: TextStyle(
+                                fontSize: 24, 
+                                fontWeight: FontWeight.bold, 
+                                color: Colors.white
+                              )
+                            ),
+                            SizedBox(height: 20),
+
+                            // --- Profile Fields ---
+                            _buildField("First Name", _firstNameCtrl, autofillHints: [AutofillHints.givenName]),
+                            _buildField("Last Name", _lastNameCtrl, autofillHints: [AutofillHints.familyName]),
+                            _buildField("Username", _usernameCtrl, autofillHints: [AutofillHints.username]),
+                            _buildField("Email", _emailCtrl, isEmail: true, autofillHints: [AutofillHints.email]),
+                            _buildField("Phone Number", _phoneCtrl, isPhone: true, autofillHints: [AutofillHints.telephoneNumber]),
+                            
+                            SizedBox(height: 20),
+                            Divider(color: Colors.white54, thickness: 1),
+                            SizedBox(height: 10),
+                            
+                            // --- Security Section ---
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                "Change Password (Optional)", 
+                                style: TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.bold)
+                              )
+                            ),
+                            
+                            _buildField(
+                              "Current Password", 
+                              _currentPasswordCtrl, 
+                              isPassword: true,
+                              isVisible: _isCurrentVisible,
+                              onVisibilityToggle: () {
+                                setState(() => _isCurrentVisible = !_isCurrentVisible);
+                              },
+                              autofillHints: [AutofillHints.password]
+                            ),
+                            
+                            _buildField(
+                              "New Password", 
+                              _newPasswordCtrl, 
+                              isPassword: true,
+                              isVisible: _isNewVisible,
+                              onVisibilityToggle: () {
+                                setState(() => _isNewVisible = !_isNewVisible);
+                              },
+                              autofillHints: [AutofillHints.newPassword]
+                            ),
+                            
+                            _buildField(
+                              "Confirm Password", 
+                              _confirmPasswordCtrl, 
+                              isPassword: true,
+                              isVisible: _isConfirmVisible,
+                              onVisibilityToggle: () {
+                                setState(() => _isConfirmVisible = !_isConfirmVisible);
+                              },
+                              autofillHints: [AutofillHints.newPassword]
+                            ),
+
+                            SizedBox(height: 30),
+                            
+                            // --- Action Buttons ---
+                            _isLoading
+                                ? CircularProgressIndicator(color: Colors.white)
+                                : ElevatedButton(
+                                    onPressed: _saveProfileChanges,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.secondary,
+                                      minimumSize: Size(double.infinity, 55),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8)
+                                      )
+                                    ),
+                                    child: Text("Update Profile", style: TextStyle(color: Colors.white, fontSize: 18)),
+                                  ),
+
+                            SizedBox(height: 15),
+                            
+                            ElevatedButton(
+                              onPressed: () async {
+                                await FirebaseAuth.instance.signOut();
+                                Navigator.pushAndRemoveUntil(
+                                  context,
+                                  MaterialPageRoute(builder: (_) => SignInScreen()),
+                                  (route) => false,
+                                );
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.redAccent.shade400,
+                                minimumSize: Size(double.infinity, 55),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8)
+                                )
+                              ),
+                              child: Text("Logout", style: TextStyle(color: Colors.white, fontSize: 18)),
+                            ),
+                            
+                            SizedBox(height: 40), // Bottom padding
+                          ],
                         ),
-                        SizedBox(height: 20),
-                      ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              );
+            },
           ),
         ),
       ),
@@ -306,7 +338,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       Iterable<String>? autofillHints
     }) {
     return Padding(
-      padding: const EdgeInsets.only(top: 10.0),
+      padding: const EdgeInsets.only(top: 15.0),
       child: TextField(
         controller: ctrl,
         obscureText: isPassword ? !isVisible : false,
@@ -317,7 +349,11 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
           hintText: hint,
           filled: true,
           fillColor: Colors.white,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(5)),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide.none
+          ),
+          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           hintStyle: TextStyle(color: Colors.grey),
           suffixIcon: isPassword 
             ? IconButton(

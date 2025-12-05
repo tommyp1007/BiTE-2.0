@@ -46,76 +46,103 @@ class _VocabularyTestingScreenState extends State<VocabularyTestingScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.primary,
-      // Fixed: Moved Panel here
       bottomNavigationBar: BottomNavPanel(),
       body: SafeArea(
         bottom: false, 
         child: Column(
           children: [
-            // Header
+            // --- HEADER ---
             AppHeader(title: "BiTE Translator"),
             
-            // Title Text
+            // --- TITLE ---
             SizedBox(height: 10),
             Text(
               "Vocabulary Learning", 
               style: TextStyle(color: AppColors.white, fontSize: 24, fontWeight: FontWeight.bold)
             ),
             
-            // GridView
+            // --- RESPONSIVE GRID ---
             Expanded(
-              child: GridView.builder(
-                padding: EdgeInsets.all(16),
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2, 
-                  crossAxisSpacing: 16, 
-                  mainAxisSpacing: 16, 
-                  childAspectRatio: 0.85
-                ),
-                itemCount: vocabList.length,
-                itemBuilder: (context, index) {
-                  final item = vocabList[index];
-                  return Card(
-                    color: AppColors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    elevation: 4,
-                    child: InkWell(
-                      onTap: () {
-                        Navigator.push(
-                          context, 
-                          MaterialPageRoute(builder: (_) => VocabularyLearningScreen(
-                            word: item['word']!, 
-                            imageName: item['img']!, 
-                            audioFileName: item['audio']!, 
-                            englishMeaning: item['eng']!, 
-                            malayMeaning: item['mal']!
-                          ))
-                        );
-                      },
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Expanded(
-                            flex: 3,
-                            child: Padding(
-                              padding: const EdgeInsets.all(8.0),
-                              child: Image.asset(
-                                'assets/images/${item['img']}.png', 
-                                fit: BoxFit.contain,
-                                errorBuilder: (c, e, s) => Icon(Icons.image, size: 50, color: Colors.grey)
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  // Dynamic Column Count based on width
+                  int crossAxisCount = 2;
+                  if (constraints.maxWidth > 600) crossAxisCount = 3;
+                  if (constraints.maxWidth > 900) crossAxisCount = 4;
+
+                  return Center(
+                    // Limit width on huge screens so cards don't stretch too wide
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: 1000),
+                      child: GridView.builder(
+                        padding: EdgeInsets.all(16),
+                        physics: BouncingScrollPhysics(),
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: crossAxisCount, 
+                          crossAxisSpacing: 16, 
+                          mainAxisSpacing: 16, 
+                          childAspectRatio: 0.85 // Adjust height ratio
+                        ),
+                        itemCount: vocabList.length,
+                        itemBuilder: (context, index) {
+                          final item = vocabList[index];
+                          return Card(
+                            color: AppColors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            elevation: 4,
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(12),
+                              onTap: () {
+                                Navigator.push(
+                                  context, 
+                                  MaterialPageRoute(builder: (_) => VocabularyLearningScreen(
+                                    word: item['word']!, 
+                                    imageName: item['img']!, 
+                                    audioFileName: item['audio']!, 
+                                    englishMeaning: item['eng']!, 
+                                    malayMeaning: item['mal']!
+                                  ))
+                                );
+                              },
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Expanded(
+                                    flex: 3,
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(12.0),
+                                      child: Image.asset(
+                                        'assets/images/${item['img']}.png', 
+                                        fit: BoxFit.contain,
+                                        errorBuilder: (c, e, s) => Icon(Icons.image_not_supported, size: 50, color: Colors.grey[400])
+                                      ),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    flex: 1,
+                                    child: Container(
+                                      width: double.infinity,
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey[50],
+                                        borderRadius: BorderRadius.vertical(bottom: Radius.circular(12))
+                                      ),
+                                      alignment: Alignment.center,
+                                      child: Text(
+                                        item['word']!, 
+                                        style: TextStyle(
+                                          fontSize: 18, 
+                                          fontWeight: FontWeight.bold, 
+                                          color: AppColors.primary
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                          ),
-                          Expanded(
-                            flex: 1,
-                            child: Center(
-                              child: Text(
-                                item['word']!, 
-                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black)
-                              ),
-                            ),
-                          ),
-                        ],
+                          );
+                        },
                       ),
                     ),
                   );
