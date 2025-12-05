@@ -47,7 +47,8 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
         final doc = await _db.collection('users').doc(user.uid).get();
         if (doc.exists) {
           final data = doc.data()!;
-          loadedDifficulty = data['difficulty'] ?? "easy";
+          // ⭐ FIX 1: Ensure difficulty is always lowercase to prevent "Hard" vs "hard" bugs
+          loadedDifficulty = (data['difficulty'] ?? "easy").toString().toLowerCase();
           loadedUnlockedLevel = data['unlockedLevel'] ?? 1;
 
           Map<int, int> tempStars = {};
@@ -60,9 +61,11 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
               _prefs.setStarsForLevel(lvl, stars); // Sync local
             });
           }
-          setState(() {
-            _levelStars = tempStars;
-          });
+          if (mounted) {
+            setState(() {
+              _levelStars = tempStars;
+            });
+          }
         }
       } catch (e) {
         print("Error fetching data: $e");
@@ -70,7 +73,9 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
     } else {
       // Guest Mode: Load from Prefs
       loadedUnlockedLevel = await _prefs.getUnlockedLevel();
-      loadedDifficulty = await _prefs.getSavedDifficulty();
+      String? savedDiff = await _prefs.getSavedDifficulty();
+      // ⭐ FIX 1: Ensure local prefs are also lowercase
+      loadedDifficulty = (savedDiff ?? "easy").toLowerCase();
     }
 
     // ⭐ SAFETY FIX: If the game was reset (Level 1), force Difficulty to Easy.
@@ -94,6 +99,7 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
   List<int> _getLevelsForDifficulty() {
     if (_difficulty == 'medium') return [6, 7, 8, 9, 10];
     if (_difficulty == 'hard') return [11, 12, 13, 14, 15];
+    // Default to easy if mismatch or 'easy'
     return [1, 2, 3, 4, 5];
   }
 
@@ -141,156 +147,155 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
             colors: [Color(0xFF87CEEB), Color(0xFFADD8E6), Color(0xFFE0F7FA)],
           ),
         ),
-        // LayoutBuilder is key for responsive design
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            return SafeArea(
-              bottom: false, // BottomNav handles the bottom safe area
-              child: SingleChildScrollView(
-                child: ConstrainedBox(
-                  // Forces the content to be at least as tall as the screen
-                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                  child: Center(
-                    // Constrain width for Tablets/iPads
-                    child: Container(
-                      constraints: BoxConstraints(maxWidth: 600),
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                      child: IntrinsicHeight(
-                        child: Column(
+        // ⭐ FIX 2: Switched to CustomScrollView with SliverFillRemaining
+        // This solves the responsiveness issue. It allows the content to center vertically
+        // when there is space, but scroll naturally on small screens without breaking the layout.
+        child: SafeArea(
+          bottom: false,
+          child: CustomScrollView(
+            slivers: [
+              SliverFillRemaining(
+                hasScrollBody: false, // Ensures content stretches to fill screen
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: Column(
+                    children: [
+                      // ---------- HEADER ----------
+                      Padding(
+                        padding: const EdgeInsets.only(top: 10),
+                        child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // ---------- HEADER ----------
-                            Padding(
-                              padding: const EdgeInsets.only(top: 10),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                            GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: () {
+                                Navigator.pushReplacement(
+                                  context,
+                                  MaterialPageRoute(builder: (_) => WordGuessEntryScreen()),
+                                );
+                              },
+                              child: Image.asset('assets/images/back_icon.png', width: 40),
+                            ),
+                            Expanded(
+                              child: Column(
                                 children: [
-                                  GestureDetector(
-                                    behavior: HitTestBehavior.opaque,
-                                    onTap: () {
-                                      Navigator.pushReplacement(
-                                        context,
-                                        MaterialPageRoute(builder: (_) => WordGuessEntryScreen()),
-                                      );
-                                    },
-                                    child: Image.asset('assets/images/back_icon.png', width: 40),
+                                  FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: Text(
+                                      "SELECT LEVEL",
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 32,
+                                        fontWeight: FontWeight.bold,
+                                        shadows: [
+                                          Shadow(color: Colors.blue, offset: Offset(2, 2), blurRadius: 4)
+                                        ],
+                                      ),
+                                    ),
                                   ),
-                                  Expanded(
-                                    child: Column(
-                                      children: [
-                                        FittedBox(
-                                          fit: BoxFit.scaleDown,
-                                          child: Text(
-                                            "SELECT LEVEL",
-                                            style: TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 32,
-                                              fontWeight: FontWeight.bold,
-                                              shadows: [
-                                                Shadow(color: Colors.blue, offset: Offset(2, 2), blurRadius: 4)
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                        Text(
-                                          "${_difficulty.toUpperCase()} MODE",
-                                          style: TextStyle(
-                                            color: _getDifficultyColor(),
-                                            fontSize: 24,
-                                            fontWeight: FontWeight.bold,
-                                            shadows: const [
-                                              Shadow(color: Colors.white, offset: Offset(0, 1), blurRadius: 1),
-                                              Shadow(color: Colors.black12, offset: Offset(1, 1), blurRadius: 2),
-                                            ],
-                                          ),
-                                        ),
+                                  Text(
+                                    "${_difficulty.toUpperCase()} MODE",
+                                    style: TextStyle(
+                                      color: _getDifficultyColor(),
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.bold,
+                                      shadows: const [
+                                        Shadow(color: Colors.white, offset: Offset(0, 1), blurRadius: 1),
+                                        Shadow(color: Colors.black12, offset: Offset(1, 1), blurRadius: 2),
                                       ],
                                     ),
                                   ),
-                                  IconButton(
-                                    icon: const Icon(Icons.settings, color: Colors.white, size: 30),
-                                    onPressed: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(builder: (_) => const GameSettingsScreen()),
-                                      );
-                                    },
-                                  ),
                                 ],
                               ),
                             ),
-
-                            // ---------- LEVEL GRID (Centered vertically) ----------
-                            Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 20),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      _buildLevelButton(levels[0]),
-                                      const SizedBox(width: 30),
-                                      _buildLevelButton(levels[1]),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 30),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      _buildLevelButton(levels[2]),
-                                      const SizedBox(width: 30),
-                                      _buildLevelButton(levels[3]),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 30),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      _buildLevelButton(levels[4]),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-
-                            // ---------- DIFFICULTY NAV ----------
-                            Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  _buildNavArrow(
-                                    Icons.arrow_back,
-                                    _difficulty == 'easy'
-                                        ? null
-                                        : () {
-                                            if (_difficulty == 'medium') _updateDifficulty('easy');
-                                            else if (_difficulty == 'hard') _updateDifficulty('medium');
-                                          },
-                                  ),
-                                  _buildNavArrow(
-                                    Icons.arrow_forward,
-                                    _difficulty == 'hard'
-                                        ? null
-                                        : () {
-                                            if (_difficulty == 'easy') _updateDifficulty('medium');
-                                            else if (_difficulty == 'medium') _updateDifficulty('hard');
-                                          },
-                                  ),
-                                ],
-                              ),
+                            IconButton(
+                              icon: const Icon(Icons.settings, color: Colors.white, size: 30),
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (_) => const GameSettingsScreen()),
+                                );
+                              },
                             ),
                           ],
                         ),
                       ),
-                    ),
+
+                      const Spacer(), // Pushes Grid to Center
+
+                      // ---------- LEVEL GRID ----------
+                      Center(
+                        child: Container(
+                          constraints: BoxConstraints(maxWidth: 500),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  _buildLevelButton(levels[0]),
+                                  const SizedBox(width: 30),
+                                  _buildLevelButton(levels[1]),
+                                ],
+                              ),
+                              const SizedBox(height: 30),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  _buildLevelButton(levels[2]),
+                                  const SizedBox(width: 30),
+                                  _buildLevelButton(levels[3]),
+                                ],
+                              ),
+                              const SizedBox(height: 30),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  _buildLevelButton(levels[4]),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      const Spacer(), // Pushes Arrows to Bottom
+
+                      // ---------- DIFFICULTY NAV ----------
+                      Container(
+                        constraints: BoxConstraints(maxWidth: 500),
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 30),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            _buildNavArrow(
+                              Icons.arrow_back,
+                              _difficulty == 'easy'
+                                  ? null
+                                  : () {
+                                      if (_difficulty == 'medium') _updateDifficulty('easy');
+                                      else if (_difficulty == 'hard') _updateDifficulty('medium');
+                                    },
+                            ),
+                            _buildNavArrow(
+                              Icons.arrow_forward,
+                              _difficulty == 'hard'
+                                  ? null
+                                  : () {
+                                      if (_difficulty == 'easy') _updateDifficulty('medium');
+                                      else if (_difficulty == 'medium') _updateDifficulty('hard');
+                                    },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
-            );
-          },
+            ],
+          ),
         ),
       ),
     );
@@ -345,22 +350,19 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
               if (starsEarned == 3)
                 // --- CURVE 3 STAR LAYOUT ---
                 Positioned(
-                  top: 5, // Higher up to make space
+                  top: 5, 
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // Left Star (Tilted Left, Lower)
                       Transform(
                         transform: Matrix4.identity()..translate(0.0, 6.0)..rotateZ(-0.25),
                         alignment: Alignment.center,
                         child: const AnimatedStar(index: 0, earnedStars: 3, size: 18),
                       ),
-                      // Center Star (Straight, Higher, Bigger)
                       const Padding(
                         padding: EdgeInsets.symmetric(horizontal: 2.0),
                         child: AnimatedStar(index: 1, earnedStars: 3, size: 24),
                       ),
-                      // Right Star (Tilted Right, Lower)
                       Transform(
                         transform: Matrix4.identity()..translate(0.0, 6.0)..rotateZ(0.25),
                         alignment: Alignment.center,
@@ -370,7 +372,7 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
                   ),
                 )
               else
-                // --- STANDARD ROW (1 or 2 Stars) ---
+                // --- STANDARD ROW ---
                 Positioned(
                   top: 8,
                   child: Row(
@@ -382,7 +384,7 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
                         child: AnimatedStar(
                           index: index, 
                           earnedStars: starsEarned,
-                          size: 14, // Default small size
+                          size: 14, 
                         ),
                       ),
                     ),
@@ -392,7 +394,7 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
             isLocked
                 ? const Icon(Icons.lock, color: Colors.white70, size: 35)
                 : Padding(
-                    padding: const EdgeInsets.only(top: 14.0), // Shift text down slightly
+                    padding: const EdgeInsets.only(top: 14.0),
                     child: Text(
                       "$level",
                       style: const TextStyle(
@@ -437,18 +439,18 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
 }
 
 // -----------------------------------------------------------
-//  NEW ANIMATED STAR WIDGET (With Size Support)
+//  ANIMATED STAR WIDGET
 // -----------------------------------------------------------
 class AnimatedStar extends StatefulWidget {
   final int index;
   final int earnedStars;
-  final double size; // Added size parameter
+  final double size; 
   
   const AnimatedStar({
     Key? key, 
     required this.index, 
     required this.earnedStars,
-    this.size = 14.0, // Default value
+    this.size = 14.0, 
   }) : super(key: key);
 
   @override
@@ -464,28 +466,23 @@ class _AnimatedStarState extends State<AnimatedStar> with TickerProviderStateMix
   void initState() {
     super.initState();
 
-    // 1. Pop-in (Zoom) Animation
     _scaleController = AnimationController(
       vsync: this,
-      duration: Duration(milliseconds: 600 + (widget.index * 200)), // Staggered delay
+      duration: Duration(milliseconds: 600 + (widget.index * 200)), 
     );
 
     _scaleAnimation = CurvedAnimation(
       parent: _scaleController,
-      curve: Curves.elasticOut, // Gives the "Zoom out to Zoom in" bounce effect
+      curve: Curves.elasticOut, 
     );
 
-    // 2. Shining Animation (Only for 3 stars)
     _shineController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
     );
 
-    // Start animations if the star is earned
     if (widget.index < widget.earnedStars) {
       _scaleController.forward();
-      
-      // If perfect score (3 stars), start shining loop
       if (widget.earnedStars == 3) {
         _shineController.repeat(reverse: true);
       }
@@ -506,7 +503,7 @@ class _AnimatedStarState extends State<AnimatedStar> with TickerProviderStateMix
     return ScaleTransition(
       scale: isEarned ? _scaleAnimation : const AlwaysStoppedAnimation(1.0),
       child: isEarned && widget.earnedStars == 3
-          ? _buildShiningStar() // Special effect for 3 stars
+          ? _buildShiningStar() 
           : Icon(
               Icons.star,
               color: isEarned ? Colors.amber : Colors.black26,

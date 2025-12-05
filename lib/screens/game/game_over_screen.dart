@@ -31,13 +31,14 @@ class _GameOverScreenState extends State<GameOverScreen> {
     await _audioPlayer.play(AssetSource('audio/finish.mp3'));
   }
 
+  // ⭐ FIX 1: Return lowercase strings to match GameLevelScreen logic
   String _getDifficultyMode(int level) {
-    if (level <= 5) return "Easy";
-    if (level <= 10) return "Medium";
-    return "Hard";
+    if (level <= 5) return "easy";
+    if (level <= 10) return "medium";
+    return "hard";
   }
 
-  // Logic from Java: getNextLevel
+  // Logic to determine the next level index
   int _getNextLevel(int level) {
     if (level <= 5) return 6;      // Go to Medium
     if (level <= 10) return 11;    // Go to Hard
@@ -57,7 +58,7 @@ class _GameOverScreenState extends State<GameOverScreen> {
       await _prefs.setUnlockedLevel(nextLevel);
     }
 
-    // 2. Update Firestore (Matches Java update logic)
+    // 2. Update Firestore
     User? user = _auth.currentUser;
     if (user != null) {
       _db.collection('users').doc(user.uid).update({
@@ -72,7 +73,7 @@ class _GameOverScreenState extends State<GameOverScreen> {
     }
 
     if (mounted) {
-      // Replace current screen so user can't back into it
+      // Navigate to the next level
       Navigator.pushReplacement(
         context, 
         MaterialPageRoute(builder: (_) => PlayGameScreen(level: nextLevel))
@@ -81,6 +82,7 @@ class _GameOverScreenState extends State<GameOverScreen> {
   }
 
   void _handleExit() {
+      // Simply return to the level selection screen
       Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => GameLevelScreen()));
   }
 
@@ -92,134 +94,133 @@ class _GameOverScreenState extends State<GameOverScreen> {
 
   @override
   Widget build(BuildContext context) {
-    String diffMode = _getDifficultyMode(widget.level);
+    // Get display string (Capitalized for UI)
+    String rawDiff = _getDifficultyMode(widget.level);
+    String displayMode = rawDiff[0].toUpperCase() + rawDiff.substring(1); 
+    
     bool isLastLevel = widget.level >= 15;
 
     return Scaffold(
       backgroundColor: AppColors.primary,
       body: SafeArea(
-        child: Column(
-          children: [
-            // --- HEADER ---
-            // Stays fixed at the top
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              color: AppColors.primary,
-              child: Stack(
-                alignment: Alignment.center,
+        bottom: false,
+        child: CustomScrollView(
+          slivers: [
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: Column(
                 children: [
-                  // Back Button
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: GestureDetector(
-                      onTap: _handleExit,
-                      child: Image.asset('assets/images/back_icon.png', width: 40, height: 40),
+                  // --- HEADER ---
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    child: Stack(
+                      alignment: Alignment.center, 
+                      children: [
+                        // Back Button
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: GestureDetector(
+                            onTap: _handleExit,
+                            child: Image.asset('assets/images/back_icon.png', width: 40, height: 40),
+                          ),
+                        ),
+
+                        // Title & Icon
+                        Row(
+                          mainAxisSize: MainAxisSize.min, 
+                          children: [
+                            Image.asset(
+                              'assets/images/bite_icon.png', 
+                              width: 50, height: 50, 
+                              fit: BoxFit.contain
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
+                              "BiTE Translator",
+                              style: TextStyle(
+                                color: Colors.white, 
+                                fontSize: 22, 
+                                fontWeight: FontWeight.bold
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
 
-                  // Title & Icon
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Image.asset(
-                        'assets/images/bite_icon.png', 
-                        width: 50, 
-                        height: 50, 
-                        fit: BoxFit.contain
-                      ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        "BiTE Translator",
-                        style: TextStyle(
-                          color: Colors.white, 
-                          fontSize: 22, 
-                          fontWeight: FontWeight.bold
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-            // --- MAIN CONTENT ---
-            // Takes up remaining space but handles scrolling/centering responsive logic
-            Expanded(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  return SingleChildScrollView(
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        minHeight: constraints.maxHeight,
-                      ),
-                      child: Center(
-                        // Constrain width for tablets/desktop
-                        child: Container(
-                          constraints: BoxConstraints(maxWidth: 500),
-                          padding: const EdgeInsets.all(24.0),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              // Trophy Image
-                              Image.asset(
+                  // --- MAIN CONTENT ---
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24.0),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          // Trophy Image
+                          Flexible(
+                            child: ConstrainedBox(
+                              constraints: BoxConstraints(maxHeight: 300),
+                              child: Image.asset(
                                 'assets/images/trophy.png', 
-                                width: 280, 
-                                height: 280,
-                                fit: BoxFit.contain,
+                                fit: BoxFit.contain
                               ),
-                              
-                              SizedBox(height: 30),
-
-                              // Congratulation Text
-                              Text(
-                                "Congratulations!\nYou've completed the $diffMode Mode!", 
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: Colors.white, 
-                                  fontSize: 26, 
-                                  fontWeight: FontWeight.bold,
-                                  height: 1.2
-                                )
-                              ),
-                              
-                              SizedBox(height: 40),
-                              
-                              // --- Buttons ---
-                              if (!isLastLevel)
-                                ElevatedButton(
-                                  onPressed: _handleNextLevel, 
-                                  child: Text("Next Level Mode", style: TextStyle(fontSize: 18, color: Colors.white)),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppColors.secondary,
-                                    minimumSize: Size(double.infinity, 55),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                    elevation: 4,
-                                  ),
-                                ),
-                              
-                              if (!isLastLevel)
-                                SizedBox(height: 16),
-                              
-                              ElevatedButton(
-                                onPressed: _handleExit, 
-                                child: Text("Return", style: TextStyle(fontSize: 18, color: Colors.white)),
+                            ),
+                          ),
+                          
+                          SizedBox(height: 30),
+                          
+                          // Congratulation Text
+                          Text(
+                            "Congratulations!\nYou've completed the $displayMode Mode!", 
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.white, 
+                              fontSize: 24, 
+                              fontWeight: FontWeight.bold
+                            )
+                          ),
+                          
+                          SizedBox(height: 40),
+                          
+                          // --- Buttons ---
+                          if (!isLastLevel) ...[
+                            SizedBox(
+                              width: double.infinity,
+                              height: 55,
+                              child: ElevatedButton(
+                                onPressed: _handleNextLevel, 
+                                child: Text("Next Level Mode", style: TextStyle(fontSize: 18, color: Colors.white)),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: AppColors.secondary,
-                                  minimumSize: Size(double.infinity, 55),
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                   elevation: 4,
                                 ),
                               ),
-                              
-                              // Bottom spacer to ensure scrolling creates space at end
-                              SizedBox(height: 20),
-                            ],
+                            ),
+                            SizedBox(height: 16),
+                          ],
+                          
+                          SizedBox(
+                            width: double.infinity,
+                            height: 55,
+                            child: ElevatedButton(
+                              onPressed: _handleExit, 
+                              child: Text("Return", style: TextStyle(fontSize: 18, color: Colors.white)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.secondary,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                elevation: 4,
+                              ),
+                            ),
                           ),
-                        ),
+                          
+                          // Bottom padding for visual balance
+                          SizedBox(height: 20),
+                        ],
                       ),
                     ),
-                  );
-                },
+                  ),
+                ],
               ),
             ),
           ],
