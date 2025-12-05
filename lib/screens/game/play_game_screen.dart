@@ -369,6 +369,81 @@ class _PlayGameScreenState extends State<PlayGameScreen>
 
   // --- DIALOGS ---
 
+  void _showStarRulesDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext ctx) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          backgroundColor: Colors.white,
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.info_outline, color: Colors.blueAccent, size: 28),
+                    SizedBox(width: 10),
+                    Text(
+                      "Scoring Rules",
+                      style: TextStyle(
+                        fontSize: 22, 
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 15),
+                Text(
+                  "Use hints wisely to earn maximum stars!",
+                  style: TextStyle(fontSize: 16, color: Colors.black54),
+                ),
+                SizedBox(height: 15),
+                _buildRuleRow(3, "0 - 3 Hints used"),
+                SizedBox(height: 8),
+                _buildRuleRow(2, "4 - 6 Hints used"),
+                SizedBox(height: 8),
+                _buildRuleRow(1, "7+ Hints used"),
+                SizedBox(height: 25),
+                Center(
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blueAccent,
+                      shape: StadiumBorder(),
+                      padding: EdgeInsets.symmetric(horizontal: 30, vertical: 10),
+                    ),
+                    child: Text("Got it!", style: TextStyle(color: Colors.white)),
+                  ),
+                )
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildRuleRow(int stars, String text) {
+    return Row(
+      children: [
+        Row(
+          children: List.generate(3, (index) => Icon(
+            Icons.star, 
+            size: 20, 
+            color: index < stars ? Colors.amber : Colors.grey[300]
+          )),
+        ),
+        SizedBox(width: 12),
+        Text(text, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+      ],
+    );
+  }
+
   void _showHintDialog() {
     showDialog(
       context: context,
@@ -789,36 +864,61 @@ class _PlayGameScreenState extends State<PlayGameScreen>
 
                               SizedBox(height: 20),
 
-                              // 3. SHINING HINT BUTTON (Popup Trigger)
-                              // Only show if game is active
+                              // 3. SHINING HINT BUTTON + HELP ICON
                               if (!_isGameFinished)
                                 Container(
                                   margin: EdgeInsets.only(bottom: 10),
-                                  child: ElevatedButton.icon(
-                                    onPressed: _triggerHintPopup,
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.amber.shade700,
-                                      foregroundColor: Colors.white,
-                                      padding: EdgeInsets.symmetric(
-                                          horizontal: 24, vertical: 12),
-                                      shape: StadiumBorder(),
-                                      elevation: 5,
-                                    ),
-                                    // Animated Bulb Icon
-                                    icon: ScaleTransition(
-                                      scale: _bulbAnimation,
-                                      child: Icon(Icons.lightbulb,
-                                          size: 32, // Bigger size
-                                          color: Colors.yellowAccent),
-                                    ),
-                                    label: Text(
-                                      "Need a Hint?",
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                        letterSpacing: 0.5,
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      // Hint Button
+                                      ElevatedButton.icon(
+                                        onPressed: _triggerHintPopup,
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.amber.shade700,
+                                          foregroundColor: Colors.white,
+                                          padding: EdgeInsets.symmetric(
+                                              horizontal: 24, vertical: 12),
+                                          shape: StadiumBorder(),
+                                          elevation: 5,
+                                        ),
+                                        icon: ScaleTransition(
+                                          scale: _bulbAnimation,
+                                          child: Icon(Icons.lightbulb,
+                                              size: 32, 
+                                              color: Colors.yellowAccent),
+                                        ),
+                                        label: Text(
+                                          "Need a Hint?",
+                                          style: TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                            letterSpacing: 0.5,
+                                          ),
+                                        ),
                                       ),
-                                    ),
+                                      
+                                      SizedBox(width: 12),
+                                      
+                                      // Help Icon Button
+                                      InkWell(
+                                        onTap: _showStarRulesDialog,
+                                        borderRadius: BorderRadius.circular(30),
+                                        child: Container(
+                                          padding: EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white.withOpacity(0.3),
+                                            shape: BoxShape.circle,
+                                            border: Border.all(color: Colors.white54, width: 2)
+                                          ),
+                                          child: Icon(
+                                            Icons.help_outline,
+                                            color: Colors.white,
+                                            size: 26,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
 
