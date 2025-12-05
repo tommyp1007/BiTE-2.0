@@ -39,15 +39,28 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _checkUserStatus();
+    // Trigger permission request immediately on load
     _requestInitialPermissions();
   }
 
+  // ⭐ UPDATED: Requests ALL permissions in Manifest
   Future<void> _requestInitialPermissions() async {
-    await [
+    // We request specific media permissions for Android 13+ and generic storage for older versions
+    // We also include Location, Microphone, and Notifications
+    Map<Permission, PermissionStatus> statuses = await [
       Permission.microphone,
-      Permission.storage,
-      Permission.notification,
+      Permission.location,     // Matches ACCESS_FINE_LOCATION
+      Permission.notification, // Matches POST_NOTIFICATIONS
+      
+      // Storage permissions (Handles both Android 12 and Android 13+)
+      Permission.storage, 
+      Permission.photos,
+      Permission.videos,
+      Permission.audio,
     ].request();
+
+    // Optional: You can check 'statuses' here if you want to show a message if denied
+    print("Permissions request result: $statuses");
   }
 
   void _checkUserStatus() {

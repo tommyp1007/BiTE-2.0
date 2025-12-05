@@ -13,7 +13,6 @@ void main() async {
   FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
 
   // 3. Initialize Firebase
-  // Ensure firebase_options.dart is generated via FlutterFire CLI
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
@@ -39,7 +38,6 @@ class MyApp extends StatelessWidget {
           seedColor: AppColors.primary,
           primary: AppColors.primary,
           secondary: AppColors.secondary,
-          // Important: Define text styles globally to ensure consistency
         ),
         useMaterial3: true,
         textTheme: const TextTheme(

@@ -1,3 +1,4 @@
+import 'dart:io'; // Import added for Platform checking
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -79,13 +80,24 @@ class _GameSettingsScreenState extends State<GameSettingsScreen> {
     await prefs.setDouble('sfx_volume', value);
   }
 
+  // ⭐ UPDATED VIBRATION LOGIC
   void _toggleVibration(bool value) async {
     setState(() => _vibrationEnabled = value);
     widget.onVibrationChanged?.call(value);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('vibration_enabled', value);
+    
     if (value) {
-      HapticFeedback.mediumImpact();
+      // Logic: Stronger vibration for Android, standard haptics for iOS
+      if (Platform.isAndroid) {
+        // Standard buzz (Required for many Androids to feel it)
+        HapticFeedback.vibrate(); 
+      } else {
+        // Taptic feedback (Nicer on iPhone)
+        // Note: iPads usually do not have vibration hardware.
+        HapticFeedback.mediumImpact(); 
+      }
+      
       _playSound('pop'); 
     }
   }
