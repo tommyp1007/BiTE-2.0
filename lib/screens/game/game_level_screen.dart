@@ -1,3 +1,4 @@
+import 'dart:math' as math; // Import math for rotation
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -339,28 +340,59 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
         child: Stack(
           alignment: Alignment.center,
           children: [
+            // ⭐ STAR DISPLAY LOGIC
             if (!isLocked)
-              Positioned(
-                top: 8,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: List.generate(
-                    3,
-                    (index) => Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 1.0),
-                      // Use the new AnimatedStar widget here
-                      child: AnimatedStar(
-                        index: index, 
-                        earnedStars: starsEarned
+              if (starsEarned == 3)
+                // --- CURVE 3 STAR LAYOUT ---
+                Positioned(
+                  top: 5, // Higher up to make space
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // Left Star (Tilted Left, Lower)
+                      Transform(
+                        transform: Matrix4.identity()..translate(0.0, 6.0)..rotateZ(-0.25),
+                        alignment: Alignment.center,
+                        child: const AnimatedStar(index: 0, earnedStars: 3, size: 18),
+                      ),
+                      // Center Star (Straight, Higher, Bigger)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 2.0),
+                        child: AnimatedStar(index: 1, earnedStars: 3, size: 24),
+                      ),
+                      // Right Star (Tilted Right, Lower)
+                      Transform(
+                        transform: Matrix4.identity()..translate(0.0, 6.0)..rotateZ(0.25),
+                        alignment: Alignment.center,
+                        child: const AnimatedStar(index: 2, earnedStars: 3, size: 18),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                // --- STANDARD ROW (1 or 2 Stars) ---
+                Positioned(
+                  top: 8,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: List.generate(
+                      3,
+                      (index) => Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 1.0),
+                        child: AnimatedStar(
+                          index: index, 
+                          earnedStars: starsEarned,
+                          size: 14, // Default small size
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
+
             isLocked
                 ? const Icon(Icons.lock, color: Colors.white70, size: 35)
                 : Padding(
-                    padding: const EdgeInsets.only(top: 12.0),
+                    padding: const EdgeInsets.only(top: 14.0), // Shift text down slightly
                     child: Text(
                       "$level",
                       style: const TextStyle(
@@ -405,13 +437,19 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
 }
 
 // -----------------------------------------------------------
-//  NEW ANIMATED STAR WIDGET
+//  NEW ANIMATED STAR WIDGET (With Size Support)
 // -----------------------------------------------------------
 class AnimatedStar extends StatefulWidget {
   final int index;
   final int earnedStars;
+  final double size; // Added size parameter
   
-  const AnimatedStar({Key? key, required this.index, required this.earnedStars}) : super(key: key);
+  const AnimatedStar({
+    Key? key, 
+    required this.index, 
+    required this.earnedStars,
+    this.size = 14.0, // Default value
+  }) : super(key: key);
 
   @override
   State<AnimatedStar> createState() => _AnimatedStarState();
@@ -472,7 +510,7 @@ class _AnimatedStarState extends State<AnimatedStar> with TickerProviderStateMix
           : Icon(
               Icons.star,
               color: isEarned ? Colors.amber : Colors.black26,
-              size: 14,
+              size: widget.size,
             ),
     );
   }
@@ -487,12 +525,12 @@ class _AnimatedStarState extends State<AnimatedStar> with TickerProviderStateMix
             boxShadow: [
               BoxShadow(
                 color: Colors.amber.withOpacity(0.6 * _shineController.value),
-                blurRadius: 6 * _shineController.value,
+                blurRadius: (widget.size / 2) * _shineController.value,
                 spreadRadius: 2 * _shineController.value,
               ),
             ],
           ),
-          child: const Icon(Icons.star, color: Colors.amber, size: 14),
+          child: Icon(Icons.star, color: Colors.amber, size: widget.size),
         );
       },
     );
