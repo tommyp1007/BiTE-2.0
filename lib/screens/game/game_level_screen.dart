@@ -1,6 +1,4 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -150,7 +148,6 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
               child: SingleChildScrollView(
                 child: ConstrainedBox(
                   // Forces the content to be at least as tall as the screen
-                  // This allows us to use MainAxisAlignment.spaceBetween
                   constraints: BoxConstraints(minHeight: constraints.maxHeight),
                   child: Center(
                     // Constrain width for Tablets/iPads
@@ -233,7 +230,7 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       _buildLevelButton(levels[0]),
-                                      const SizedBox(width: 30), // Responsive gap
+                                      const SizedBox(width: 30),
                                       _buildLevelButton(levels[1]),
                                     ],
                                   ),
@@ -323,7 +320,6 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
         }
       },
       child: Container(
-        // Slightly reduced fixed size to fit smaller screens better
         width: 90, 
         height: 90,
         decoration: BoxDecoration(
@@ -347,12 +343,16 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
               Positioned(
                 top: 8,
                 child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: List.generate(
                     3,
-                    (index) => Icon(
-                      Icons.star,
-                      color: index < starsEarned ? Colors.amber : Colors.black26,
-                      size: 14,
+                    (index) => Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 1.0),
+                      // Use the new AnimatedStar widget here
+                      child: AnimatedStar(
+                        index: index, 
+                        earnedStars: starsEarned
+                      ),
                     ),
                   ),
                 ),
@@ -400,6 +400,101 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
         ),
         child: Icon(icon, color: Colors.white, size: 32),
       ),
+    );
+  }
+}
+
+// -----------------------------------------------------------
+//  NEW ANIMATED STAR WIDGET
+// -----------------------------------------------------------
+class AnimatedStar extends StatefulWidget {
+  final int index;
+  final int earnedStars;
+  
+  const AnimatedStar({Key? key, required this.index, required this.earnedStars}) : super(key: key);
+
+  @override
+  State<AnimatedStar> createState() => _AnimatedStarState();
+}
+
+class _AnimatedStarState extends State<AnimatedStar> with TickerProviderStateMixin {
+  late AnimationController _scaleController;
+  late Animation<double> _scaleAnimation;
+  late AnimationController _shineController;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // 1. Pop-in (Zoom) Animation
+    _scaleController = AnimationController(
+      vsync: this,
+      duration: Duration(milliseconds: 600 + (widget.index * 200)), // Staggered delay
+    );
+
+    _scaleAnimation = CurvedAnimation(
+      parent: _scaleController,
+      curve: Curves.elasticOut, // Gives the "Zoom out to Zoom in" bounce effect
+    );
+
+    // 2. Shining Animation (Only for 3 stars)
+    _shineController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    );
+
+    // Start animations if the star is earned
+    if (widget.index < widget.earnedStars) {
+      _scaleController.forward();
+      
+      // If perfect score (3 stars), start shining loop
+      if (widget.earnedStars == 3) {
+        _shineController.repeat(reverse: true);
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _scaleController.dispose();
+    _shineController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    bool isEarned = widget.index < widget.earnedStars;
+
+    return ScaleTransition(
+      scale: isEarned ? _scaleAnimation : const AlwaysStoppedAnimation(1.0),
+      child: isEarned && widget.earnedStars == 3
+          ? _buildShiningStar() // Special effect for 3 stars
+          : Icon(
+              Icons.star,
+              color: isEarned ? Colors.amber : Colors.black26,
+              size: 14,
+            ),
+    );
+  }
+
+  Widget _buildShiningStar() {
+    return AnimatedBuilder(
+      animation: _shineController,
+      builder: (context, child) {
+        return Container(
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.amber.withOpacity(0.6 * _shineController.value),
+                blurRadius: 6 * _shineController.value,
+                spreadRadius: 2 * _shineController.value,
+              ),
+            ],
+          ),
+          child: const Icon(Icons.star, color: Colors.amber, size: 14),
+        );
+      },
     );
   }
 }
