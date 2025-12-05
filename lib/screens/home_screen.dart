@@ -114,14 +114,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.primary,
-
       bottomNavigationBar: isiOS ? null : BottomNavPanel(),
-
       body: SafeArea(
         bottom: false,
         child: Column(
           children: [
-            // ------------------- TOP HEADER -------------------
+            // ------------------- TOP HEADER (Stays at Top) -------------------
             Container(
               padding: EdgeInsets.all(10),
               child: Row(
@@ -148,106 +146,108 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
 
-            SizedBox(height: 15),
-
-            // ------------------- CENTER USER ICON + WELCOME TEXT -------------------
-            Center(
-              child: Column(
-                children: [
-                  GestureDetector(
-                    onTap: () {
-                      if (isInGuestMode) _promptSignIn();
-                      else {
-                        Navigator.push(context,
-                          MaterialPageRoute(builder: (_) => ProfileEditScreen()));
-                      }
-                    },
-                    child: Image.asset('assets/images/user_icon.png',
-                        width: 65, height: 65),
-                  ),
-
-                  SizedBox(height: 10),
-
-                  GestureDetector(
-                    onTap: () {
-                      if (isInGuestMode) _promptSignIn();
-                      else {
-                        Navigator.push(context,
-                          MaterialPageRoute(builder: (_) => ProfileEditScreen()));
-                      }
-                    },
-                    child: Text(
-                      welcomeText,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            SizedBox(height: 20),
-
-            // ------------------- GRID (CENTERED FOR iOS / ANDROID) -------------------
+            // ------------------- MIDDLE SECTION (Centered Vertically) -------------------
             Expanded(
               child: Center(
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(maxWidth: 500),
-                  child: GridView.builder(
-                    padding: EdgeInsets.all(16),
-                    shrinkWrap: true,
-                    physics: AlwaysScrollableScrollPhysics(),
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      crossAxisSpacing: 16,
-                      mainAxisSpacing: 16,
-                      childAspectRatio: 1.0,
-                    ),
-                    itemCount: _gridItems.length,
-                    itemBuilder: (context, index) {
-                      final item = _gridItems[index];
-                      return Card(
-                        color: AppColors.secondary,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: InkWell(
-                          onTap: () => _handleGridClick(item['title'], item['page']),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Image.asset(
-                                'assets/images/${item['img']}',
-                                width: 60,
-                                height: 60,
-                              ),
-                              SizedBox(height: 12),
-                              Text(
-                                item['title'],
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
+                // SingleChildScrollView prevents overflow on small screens/landscape
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // User Icon
+                      GestureDetector(
+                        onTap: () {
+                          if (isInGuestMode) _promptSignIn();
+                          else {
+                            Navigator.push(context,
+                              MaterialPageRoute(builder: (_) => ProfileEditScreen()));
+                          }
+                        },
+                        child: Image.asset('assets/images/user_icon.png',
+                            width: 65, height: 65),
+                      ),
+
+                      SizedBox(height: 10),
+
+                      // Welcome Text
+                      GestureDetector(
+                        onTap: () {
+                          if (isInGuestMode) _promptSignIn();
+                          else {
+                            Navigator.push(context,
+                              MaterialPageRoute(builder: (_) => ProfileEditScreen()));
+                          }
+                        },
+                        child: Text(
+                          welcomeText,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
-                      );
-                    },
+                      ),
+
+                      SizedBox(height: 20),
+
+                      // Grid Items
+                      ConstrainedBox(
+                        constraints: BoxConstraints(maxWidth: 500),
+                        child: GridView.builder(
+                          padding: EdgeInsets.symmetric(horizontal: 16),
+                          shrinkWrap: true, // Crucial for nesting inside Center/Column
+                          physics: NeverScrollableScrollPhysics(), // Disables internal grid scrolling
+                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            crossAxisSpacing: 16,
+                            mainAxisSpacing: 16,
+                            childAspectRatio: 1.0,
+                          ),
+                          itemCount: _gridItems.length,
+                          itemBuilder: (context, index) {
+                            final item = _gridItems[index];
+                            return Card(
+                              color: AppColors.secondary,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: InkWell(
+                                onTap: () => _handleGridClick(item['title'], item['page']),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Image.asset(
+                                      'assets/images/${item['img']}',
+                                      width: 60,
+                                      height: 60,
+                                    ),
+                                    SizedBox(height: 12),
+                                    Text(
+                                      item['title'],
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
             ),
 
-            // ------------------- BOTTOM TRADEMARK -------------------
+            // ------------------- BOTTOM TRADEMARK (Stays at Bottom) -------------------
             Padding(
-              padding: EdgeInsets.only(bottom: isiOS ? 16 : 8),
+              padding: EdgeInsets.only(bottom: isiOS ? 16 : 8, top: 10),
               child: Text(
                 "Developed by: TOMMY ANAK PEYEI",
                 style: TextStyle(color: Colors.white, fontSize: 12),

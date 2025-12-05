@@ -1,22 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-class GameState {
-  final int level;
-  final int score;
-  final String difficulty;
-  final int unlockedLevel;
-  final Map<String, dynamic> levelStars;
-
-  GameState({
-    required this.level, 
-    required this.score, 
-    required this.difficulty, 
-    required this.unlockedLevel,
-    required this.levelStars,
-  });
-}
-
 class GameDataManager {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -63,7 +47,7 @@ class GameDataManager {
     }
   }
 
-  // Reset Game Progress
+  // ⭐ FIXED: Reset now forces difficulty to 'easy'
   Future<void> resetGameProgress() async {
     User? user = _auth.currentUser;
     if (user != null) {
@@ -71,6 +55,7 @@ class GameDataManager {
         await _firestore.collection("users").doc(user.uid).update({
           "currentLevel": 1,
           "unlockedLevel": 1,
+          "difficulty": "easy", // Added this to fix the 'Locked Screen' bug
           "score": 0, 
           "levelStars": {}, 
         });

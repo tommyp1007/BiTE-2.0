@@ -10,9 +10,7 @@ import '../../services/game_data_manager.dart';
 import 'play_game_screen.dart';
 import 'game_settings_setup.dart';
 import 'word_guess_entry_screen.dart';
-import '../home_screen.dart';
-
-// ⭐ NEW IMPORT for shared bottom panel
+// Import your shared bottom panel
 import '../../widgets/common_layouts.dart';
 
 class GameLevelScreen extends StatefulWidget {
@@ -24,7 +22,6 @@ class GameLevelScreen extends StatefulWidget {
 
 class _GameLevelScreenState extends State<GameLevelScreen> {
   final SharedPreferencesHelper _prefs = SharedPreferencesHelper();
-  final GameDataManager _gameDataManager = GameDataManager();
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
@@ -41,34 +38,59 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
 
   Future<void> _loadUserGameData() async {
     User? user = _auth.currentUser;
+    
+    // Default values
+    String loadedDifficulty = "easy";
+    int loadedUnlockedLevel = 1;
 
     if (user != null) {
-      final doc = await _db.collection('users').doc(user.uid).get();
+      try {
+        final doc = await _db.collection('users').doc(user.uid).get();
+        if (doc.exists) {
+          final data = doc.data()!;
+          loadedDifficulty = data['difficulty'] ?? "easy";
+          loadedUnlockedLevel = data['unlockedLevel'] ?? 1;
 
-      if (doc.exists) {
-        final data = doc.data()!;
-        setState(() {
-          _difficulty = data['difficulty'] ?? "easy";
-          _unlockedLevel = data['unlockedLevel'] ?? 1;
-
-          _levelStars = {};
+          Map<int, int> tempStars = {};
           if (data['levelStars'] != null) {
             Map<String, dynamic> starsMap = data['levelStars'];
             starsMap.forEach((key, value) {
               int lvl = int.parse(key);
               int stars = value as int;
-              _levelStars[lvl] = stars;
-              _prefs.setStarsForLevel(lvl, stars);
+              tempStars[lvl] = stars;
+              _prefs.setStarsForLevel(lvl, stars); // Sync local
             });
           }
-        });
+          setState(() {
+            _levelStars = tempStars;
+          });
+        }
+      } catch (e) {
+        print("Error fetching data: $e");
       }
+    } else {
+      // Guest Mode: Load from Prefs
+      loadedUnlockedLevel = await _prefs.getUnlockedLevel();
+      loadedDifficulty = await _prefs.getSavedDifficulty();
     }
 
-    _prefs.saveDifficulty(_difficulty);
-    _prefs.setUnlockedLevel(_unlockedLevel);
+    // ⭐ SAFETY FIX: If the game was reset (Level 1), force Difficulty to Easy.
+    // This prevents being stuck on "Hard" screen with all levels locked.
+    if (loadedUnlockedLevel == 1) {
+      loadedDifficulty = "easy";
+    }
 
-    setState(() => _loading = false);
+    if (mounted) {
+      setState(() {
+        _difficulty = loadedDifficulty;
+        _unlockedLevel = loadedUnlockedLevel;
+        _loading = false;
+      });
+    }
+
+    // Sync back to prefs to be safe
+    await _prefs.saveDifficulty(loadedDifficulty);
+    await _prefs.setUnlockedLevel(loadedUnlockedLevel);
   }
 
   List<int> _getLevelsForDifficulty() {
@@ -79,12 +101,9 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
 
   Color _getDifficultyColor() {
     switch (_difficulty) {
-      case 'medium':
-        return Colors.orange;
-      case 'hard':
-        return Colors.red;
-      default:
-        return Colors.green;
+      case 'medium': return Colors.orange;
+      case 'hard': return Colors.red;
+      default: return Colors.green;
     }
   }
 
@@ -102,6 +121,7 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
   Widget build(BuildContext context) {
     if (_loading) {
       return const Scaffold(
+        backgroundColor: Colors.white,
         body: Center(child: CircularProgressIndicator()),
       );
     }
@@ -109,7 +129,13 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
     List<int> levels = _getLevelsForDifficulty();
 
     return Scaffold(
+      // Ensure bottom bar stays put
+      bottomNavigationBar: BottomNavPanel(),
+      resizeToAvoidBottomInset: false, // Prevents squashing when keyboard/other UI appears
+      
       body: Container(
+        width: double.infinity,
+        height: double.infinity,
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
@@ -118,6 +144,7 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
           ),
         ),
         child: SafeArea(
+          bottom: false,
           child: Column(
             children: [
               // ---------- HEADER ----------
@@ -127,6 +154,7 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     GestureDetector(
+                      behavior: HitTestBehavior.opaque, // Ensures click is registered
                       onTap: () {
                         Navigator.pushReplacement(
                           context,
@@ -144,10 +172,7 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
                             fontSize: 32,
                             fontWeight: FontWeight.bold,
                             shadows: [
-                              Shadow(
-                                  color: Colors.blue,
-                                  offset: Offset(2, 2),
-                                  blurRadius: 4)
+                              Shadow(color: Colors.blue, offset: Offset(2, 2), blurRadius: 4)
                             ],
                           ),
                         ),
@@ -179,10 +204,13 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
               ),
 
               // ---------- LEVEL GRID ----------
+              // Expanded ensures it takes remaining space, Center keeps it middle
               Expanded(
                 child: Center(
                   child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(), // Better touch feel
                     child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -225,11 +253,8 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
                       _difficulty == 'easy'
                           ? null
                           : () {
-                              if (_difficulty == 'medium') {
-                                _updateDifficulty('easy');
-                              } else if (_difficulty == 'hard') {
-                                _updateDifficulty('medium');
-                              }
+                              if (_difficulty == 'medium') _updateDifficulty('easy');
+                              else if (_difficulty == 'hard') _updateDifficulty('medium');
                             },
                     ),
                     _buildNavArrow(
@@ -237,19 +262,13 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
                       _difficulty == 'hard'
                           ? null
                           : () {
-                              if (_difficulty == 'easy') {
-                                _updateDifficulty('medium');
-                              } else if (_difficulty == 'medium') {
-                                _updateDifficulty('hard');
-                              }
+                              if (_difficulty == 'easy') _updateDifficulty('medium');
+                              else if (_difficulty == 'medium') _updateDifficulty('hard');
                             },
                     ),
                   ],
                 ),
               ),
-
-              // ⭐ USE SHARED BOTTOM PANEL
-              BottomNavPanel(),
             ],
           ),
         ),
@@ -263,11 +282,13 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
     int starsEarned = _levelStars[level] ?? 0;
 
     return GestureDetector(
+      behavior: HitTestBehavior.opaque, // CRITICAL for touch responsiveness
       onTap: () {
         if (isLocked) {
+          ScaffoldMessenger.of(context).hideCurrentSnackBar();
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text("Level is locked"),
+              content: Text("Complete previous levels to unlock!"),
               duration: Duration(seconds: 1),
               backgroundColor: Colors.redAccent,
             ),
@@ -342,6 +363,7 @@ class _GameLevelScreenState extends State<GameLevelScreen> {
   Widget _buildNavArrow(IconData icon, VoidCallback? onTap) {
     bool isDisabled = onTap == null;
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(10),

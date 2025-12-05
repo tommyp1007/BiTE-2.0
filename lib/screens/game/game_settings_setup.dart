@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:audioplayers/audioplayers.dart';
+
+// Internal Imports (Adjust paths if necessary)
 import '../../theme/app_colors.dart';
 import '../../services/shared_preferences_helper.dart'; 
 import '../../services/game_data_manager.dart'; 
-// ⭐ Import GameLevelScreen to navigate back to it
 import 'game_level_screen.dart'; 
 
 class GameSettingsScreen extends StatefulWidget {
@@ -41,12 +42,11 @@ class _GameSettingsScreenState extends State<GameSettingsScreen> {
     _loadSettings();
   }
 
-  // 🔥 REMOVED THE DUPLICATE dispose() METHOD HERE (Was line 45-49)
-  // @override
-  // void dispose() {
-  //   _settingsPlayer.dispose();
-  //   super.dispose();
-  // }
+  @override
+  void dispose() {
+    _settingsPlayer.dispose();
+    super.dispose();
+  }
 
   // --- AUDIO HELPER ---
   void _playSound(String fileName, {double? volumeOverride}) async {
@@ -101,7 +101,7 @@ class _GameSettingsScreenState extends State<GameSettingsScreen> {
           style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)
         ),
         content: const Text(
-          "Are you SURE you want to reset your game progress? You will LOSE your current data. This action cannot be undone.",
+          "Are you SURE you want to reset your game progress? You will LOSE your current data and return to Level 1. This action cannot be undone.",
           style: TextStyle(color: Colors.black, fontSize: 16),
         ),
         actions: [
@@ -122,12 +122,18 @@ class _GameSettingsScreenState extends State<GameSettingsScreen> {
     );
   }
 
-  // ⭐ RESET LOGIC: Execution & Navigation
+  // ⭐ RESET LOGIC: Critical Fix for Unresponsive Screen
   Future<void> _performReset() async {
     // 1. Reset Local Storage
     await _prefsHelper.resetGameProgress();
     
+    // ⭐ CRITICAL: Manually set difficulty back to easy in SharedPreferences
+    // This ensures that when the next screen loads, it knows to show the "Easy" layout (Levels 1-5)
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString("difficulty", "easy");
+    
     // 2. Reset Firebase (Cloud)
+    // Ensure your GameDataManager also updates 'difficulty' to 'easy' (as updated in previous step)
     await _gameDataManager.resetGameProgress();
 
     if (mounted) {
@@ -142,20 +148,15 @@ class _GameSettingsScreenState extends State<GameSettingsScreen> {
         )
       );
 
-      // 4. Navigate back to GameLevelScreen automatically
+      // 4. Navigate back to GameLevelScreen cleanly
+      // We use pushAndRemoveUntil to REMOVE all previous routes (including the stuck LevelScreen)
+      // This forces the app to create a BRAND NEW GameLevelScreen instance, running initState() fresh.
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (context) => GameLevelScreen()),
-        (Route<dynamic> route) => route.isFirst, // Keeps the Main Menu (if it exists) in the stack
+        (Route<dynamic> route) => false, // Clears the stack completely
       );
     }
-  }
-
-  // This is the correct, singular definition of dispose()
-  @override
-  void dispose() {
-    _settingsPlayer.dispose();
-    super.dispose();
   }
 
   @override
@@ -187,7 +188,7 @@ class _GameSettingsScreenState extends State<GameSettingsScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 40),
+                  const SizedBox(width: 40), // Balances the back icon
                 ],
               ),
             ),
