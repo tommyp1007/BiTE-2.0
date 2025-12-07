@@ -5,38 +5,92 @@ import '../home_screen.dart';
 
 class WordGuessEntryScreen extends StatelessWidget {
   
-  // Function to show the popup dialog
+  // --- UPDATED DIALOG DESIGN (Clear & Readable) ---
   void _showHelpDialog(BuildContext context) {
     showDialog(
       context: context,
+      barrierDismissible: true,
       builder: (BuildContext context) {
-        return AlertDialog(
+        return Dialog(
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20), // Rounded corners for modern look
+            borderRadius: BorderRadius.circular(25.0), // Modern rounded corners
           ),
-          title: Row(
-            children: const [
-              Icon(Icons.info_outline, color: Color(0xFFFF6E00)),
-              SizedBox(width: 10),
-              Text("Game Info"),
-            ],
-          ),
-          content: SingleChildScrollView(
-            // SingleChildScrollView ensures it fits on small screens (landscape phones etc)
-            child: const Text(
-              "Uncover the Bidayuh word behind each figure. Use hints wisely to crack the puzzle!.",
-              style: TextStyle(fontSize: 16, height: 1.5),
+          elevation: 10,
+          backgroundColor: Colors.white, // Force White background for maximum clarity
+          child: Container(
+            padding: const EdgeInsets.all(24.0),
+            constraints: const BoxConstraints(maxWidth: 400), // proper width on tablets
+            child: Column(
+              mainAxisSize: MainAxisSize.min, // Wrap content height
+              children: [
+                // 1. Large Icon for Visual Context
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFF6E00).withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.lightbulb_outline_rounded, // "Idea" or "Hint" icon
+                    color: Color(0xFFFF6E00),
+                    size: 48,
+                  ),
+                ),
+                
+                const SizedBox(height: 20),
+
+                // 2. Clear Title
+                const Text(
+                  "Game Info",
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87, // Dark text for visibility
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+
+                const SizedBox(height: 16),
+
+                // 3. Readable Body Text
+                const Text(
+                  "Uncover the Bidayuh word behind each figure. Use hints wisely to crack the puzzle!",
+                  style: TextStyle(
+                    fontSize: 16,
+                    height: 1.5, // Better line spacing for readability
+                    color: Colors.black54, // Soft black for comfortable reading
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+
+                const SizedBox(height: 24),
+
+                // 4. Full Width Action Button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFFF6E00), // App Orange
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      "Got it!",
+                      style: TextStyle(
+                        fontSize: 16, 
+                        fontWeight: FontWeight.bold
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              style: TextButton.styleFrom(
-                foregroundColor: const Color(0xFFFF6E00), // Match App Orange
-              ),
-              child: const Text("Got it!", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            ),
-          ],
         );
       },
     );
@@ -84,7 +138,7 @@ class WordGuessEntryScreen extends StatelessWidget {
                               // --- GAME LOGO ---
                               Image.asset(
                                 'assets/images/game_entry.png', 
-                                width: 280, // Slightly larger for impact
+                                width: 280, 
                                 height: 280, 
                                 fit: BoxFit.contain,
                                 errorBuilder: (c, e, s) => const Icon(Icons.videogame_asset, size: 120, color: Colors.white),
@@ -170,8 +224,6 @@ class WordGuessEntryScreen extends StatelessWidget {
                       shape: BoxShape.circle,
                       color: Colors.black.withOpacity(0.05), // Matches the back button style
                     ),
-                    // Using a standard Flutter icon here. 
-                    // If you have a specific asset, replace Icon with Image.asset like the back button.
                     child: const Icon(
                       Icons.help_outline_rounded, 
                       color: Colors.white, 

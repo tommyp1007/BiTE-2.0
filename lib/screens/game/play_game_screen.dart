@@ -38,6 +38,10 @@ class _PlayGameScreenState extends State<PlayGameScreen>
   late AnimationController _starController;
   late Animation<double> _starScaleAnimation;
 
+  // --- Text Hint Animation (New) ---
+  late AnimationController _textHintController;
+  late Animation<double> _textHintOpacity;
+
   // --- Firebase & Prefs ---
   final SharedPreferencesHelper _prefs = SharedPreferencesHelper();
   final GameDataManager _dataManager = GameDataManager();
@@ -95,7 +99,7 @@ class _PlayGameScreenState extends State<PlayGameScreen>
     _bulbController = AnimationController(
       duration: const Duration(seconds: 1),
       vsync: this,
-    )..repeat(reverse: true); // Pulse back and forth
+    )..repeat(reverse: true);
 
     _bulbAnimation = Tween<double>(begin: 1.0, end: 1.3).animate(
       CurvedAnimation(parent: _bulbController, curve: Curves.easeInOut),
@@ -103,13 +107,22 @@ class _PlayGameScreenState extends State<PlayGameScreen>
 
     // --- Animation for Shining Star (Winner) ---
     _starController = AnimationController(
-      duration: const Duration(milliseconds: 700), // Slightly faster pulse
+      duration: const Duration(milliseconds: 700),
       vsync: this,
     );
     
-    // Create a pulsing effect (scale up and down)
     _starScaleAnimation = Tween<double>(begin: 1.0, end: 1.2).animate(
       CurvedAnimation(parent: _starController, curve: Curves.easeInOut),
+    );
+
+    // --- Animation for Text Hint (Breathing Effect) ---
+    _textHintController = AnimationController(
+      duration: const Duration(seconds: 2), // Slow breath
+      vsync: this,
+    )..repeat(reverse: true);
+
+    _textHintOpacity = Tween<double>(begin: 0.4, end: 1.0).animate(
+      CurvedAnimation(parent: _textHintController, curve: Curves.easeInOut),
     );
 
     _currentLevel = widget.level;
@@ -357,7 +370,7 @@ class _PlayGameScreenState extends State<PlayGameScreen>
       try {
         DocumentSnapshot doc = await _db.collection('users').doc(user.uid).get();
         if (doc.exists) {
-           serverUnlockedLevel = doc.get('unlockedLevel') ?? 1;
+            serverUnlockedLevel = doc.get('unlockedLevel') ?? 1;
         }
       } catch (e) {
         serverUnlockedLevel = await _prefs.getUnlockedLevel();
@@ -631,7 +644,6 @@ class _PlayGameScreenState extends State<PlayGameScreen>
   }
 
   void _showCorrectDialog(int stars) {
-    // START the star animation immediately when dialog shows
     if (stars == 3) {
       _starController.repeat(reverse: true);
     } else {
@@ -654,7 +666,6 @@ class _PlayGameScreenState extends State<PlayGameScreen>
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // REPLACED: New Star Display Logic
                     _buildStarDisplay(stars),
                     
                     SizedBox(height: 15),
@@ -672,7 +683,6 @@ class _PlayGameScreenState extends State<PlayGameScreen>
                     ElevatedButton(
                       onPressed: () {
                         _triggerVibration(); 
-                        // Stop animation when leaving
                         _starController.stop(); 
                         Navigator.of(ctx).pop();
                         if (_isFinalLevel()) {
@@ -702,10 +712,8 @@ class _PlayGameScreenState extends State<PlayGameScreen>
     );
   }
 
-  // --- STAR DISPLAY LOGIC ---
   Widget _buildStarDisplay(int stars) {
     if (stars == 3) {
-      // 3-Star Curve with FULL ANIMATION
       return SizedBox(
         height: 100, 
         width: 180, 
@@ -713,31 +721,28 @@ class _PlayGameScreenState extends State<PlayGameScreen>
           alignment: Alignment.center,
           clipBehavior: Clip.none,
           children: [
-            // Left Star (Tilted Left, Scaled, Glowing)
             Positioned(
               left: 0,
               bottom: 0,
               child: ScaleTransition(
                 scale: _starScaleAnimation,
                 child: Transform.rotate(
-                  angle: -20 * pi / 180, // -20 degrees
+                  angle: -20 * pi / 180, 
                   child: _buildGlowingStar(50),
                 ),
               ),
             ),
-            // Right Star (Tilted Right, Scaled, Glowing)
             Positioned(
               right: 0,
               bottom: 0,
               child: ScaleTransition(
                 scale: _starScaleAnimation,
                 child: Transform.rotate(
-                  angle: 20 * pi / 180, // 20 degrees
+                  angle: 20 * pi / 180, 
                   child: _buildGlowingStar(50),
                 ),
               ),
             ),
-            // Center Star (Higher, Scaled, Glowing)
             Positioned(
               top: 0,
               child: ScaleTransition(
@@ -749,7 +754,6 @@ class _PlayGameScreenState extends State<PlayGameScreen>
         ),
       );
     } else {
-      // For 1 or 2 Stars (Static)
       return Row(
         mainAxisSize: MainAxisSize.min, 
         mainAxisAlignment: MainAxisAlignment.center,
@@ -768,14 +772,13 @@ class _PlayGameScreenState extends State<PlayGameScreen>
     }
   }
 
-  // Helper widget to add glow/shine to stars
   Widget _buildGlowingStar(double size) {
     return Container(
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         boxShadow: [
           BoxShadow(
-            color: Colors.amber.withOpacity(0.6), // Shine effect
+            color: Colors.amber.withOpacity(0.6), 
             blurRadius: 15,
             spreadRadius: 2,
           )
@@ -850,6 +853,7 @@ class _PlayGameScreenState extends State<PlayGameScreen>
     WidgetsBinding.instance.removeObserver(this);
     _bulbController.dispose(); 
     _starController.dispose(); 
+    _textHintController.dispose(); // Dispose new controller
     _bgmPlayer.dispose();
     _sfxPlayer.dispose();
     super.dispose();
@@ -959,7 +963,7 @@ class _PlayGameScreenState extends State<PlayGameScreen>
 
                               SizedBox(height: 20),
 
-                              // 2. WORD DISPLAY
+                              // 2. WORD DISPLAY (ANSWER BOX) - UPDATED
                               Container(
                                 width: double.infinity,
                                 padding: EdgeInsets.symmetric(
@@ -970,17 +974,31 @@ class _PlayGameScreenState extends State<PlayGameScreen>
                                   border: Border.all(color: Colors.white30, width: 1)
                                 ),
                                 child: Center(
-                                  child: Text(
-                                    _selectedLetters.isEmpty
-                                        ? "Answer in Bidayuh Word"
-                                        : _selectedLetters.join(""),
-                                    style: TextStyle(
-                                      fontSize: 28,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
-                                      letterSpacing: 4,
-                                    ),
-                                  ),
+                                  child: _selectedLetters.isEmpty
+                                    // *** ANIMATED PLACEHOLDER ***
+                                    ? FadeTransition(
+                                        opacity: _textHintOpacity,
+                                        child: Text(
+                                          "In Bidayuh, it is…",
+                                          style: TextStyle(
+                                            fontSize: 20, // Smaller for readability
+                                            fontWeight: FontWeight.w500, // Medium weight
+                                            color: Colors.white70, // Slightly dimmer
+                                            fontStyle: FontStyle.italic,
+                                            letterSpacing: 1.0,
+                                          ),
+                                        ),
+                                      )
+                                    // *** TYPED ANSWER ***
+                                    : Text(
+                                        _selectedLetters.join(""),
+                                        style: TextStyle(
+                                          fontSize: 28, // Large for typing
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                          letterSpacing: 4,
+                                        ),
+                                      ),
                                 ),
                               ),
 
