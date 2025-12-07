@@ -972,7 +972,7 @@ class _PlayGameScreenState extends State<PlayGameScreen>
                                 child: Center(
                                   child: Text(
                                     _selectedLetters.isEmpty
-                                        ? "..."
+                                        ? "Answer in Bidayuh Word"
                                         : _selectedLetters.join(""),
                                     style: TextStyle(
                                       fontSize: 28,

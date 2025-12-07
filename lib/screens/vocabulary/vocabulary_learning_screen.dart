@@ -1,6 +1,8 @@
+import 'dart:io'; // Required for File access
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart'; // Required for offline caching
 import '../../theme/app_colors.dart';
 import '../../widgets/common_layouts.dart';
 
@@ -26,13 +28,13 @@ class VocabularyLearningScreen extends StatefulWidget {
 class _VocabularyLearningScreenState extends State<VocabularyLearningScreen> {
   final AudioPlayer _player = AudioPlayer();
   bool _isPlaying = false;
-  String? _audioUrl;
-  bool _isLoadingAudio = true;
+  bool _isAudioReady = false; // Tracks if the file is downloaded and ready
+  bool _isLoadingAudio = true; // Tracks the download process for UI feedback
 
   @override
   void initState() {
     super.initState();
-    _fetchAudio();
+    _fetchAndCacheAudio();
     
     _player.onPlayerStateChanged.listen((state) {
       if (mounted) {
@@ -42,6 +44,8 @@ class _VocabularyLearningScreenState extends State<VocabularyLearningScreen> {
       }
     });
 
+    // Use 'stop' mode so we don't lose the buffer. 
+    // Just update UI when finished.
     _player.onPlayerComplete.listen((event) {
       if (mounted) {
         setState(() {
@@ -51,15 +55,29 @@ class _VocabularyLearningScreenState extends State<VocabularyLearningScreen> {
     });
   }
 
-  Future<void> _fetchAudio() async {
+  // 1. Get URL from Firebase
+  // 2. Download to local storage (Cache)
+  // 3. Load player from local file
+  Future<void> _fetchAndCacheAudio() async {
     try {
       final ref = FirebaseStorage.instance.ref().child("vocabulary_audio/${widget.audioFileName}");
+      
+      // Get the download URL (Needs internet only the first time)
       final url = await ref.getDownloadURL();
+      
+      // Download and save to phone storage (Offline support)
+      File localFile = await DefaultCacheManager().getSingleFile(url);
+
       if (mounted) {
+        // Prepare the player with the LOCAL file
+        await _player.setReleaseMode(ReleaseMode.stop);
+        await _player.setSource(DeviceFileSource(localFile.path));
+
         setState(() {
-          _audioUrl = url;
+          _isAudioReady = true;
           _isLoadingAudio = false;
         });
+        print("Audio loaded from cache: ${localFile.path}");
       }
     } catch (e) {
       print("Audio fetch error: $e");
@@ -68,12 +86,14 @@ class _VocabularyLearningScreenState extends State<VocabularyLearningScreen> {
   }
 
   void _toggleAudio() async {
-    if (_audioUrl == null) return;
+    // If audio hasn't finished downloading/caching, do nothing
+    if (!_isAudioReady) return;
     
     if (_isPlaying) {
       await _player.pause();
     } else {
-      await _player.play(UrlSource(_audioUrl!));
+      // Use resume() because the source is already set in _fetchAndCacheAudio
+      await _player.resume();
     }
   }
 
@@ -87,7 +107,8 @@ class _VocabularyLearningScreenState extends State<VocabularyLearningScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.primary,
-      bottomNavigationBar: BottomNavPanel(),
+      // assumed you have this widget defined in your project
+      // bottomNavigationBar: BottomNavPanel(), 
       body: SafeArea(
         bottom: false,
         child: Column(
@@ -183,7 +204,8 @@ class _VocabularyLearningScreenState extends State<VocabularyLearningScreen> {
                                     
                                     // Audio Controls
                                     GestureDetector(
-                                      onTap: _isLoadingAudio || _audioUrl == null ? null : _toggleAudio,
+                                      // Disable tap if audio is still loading/caching
+                                      onTap: _isAudioReady ? _toggleAudio : null,
                                       child: AnimatedContainer(
                                         duration: Duration(milliseconds: 200),
                                         padding: EdgeInsets.all(5),
@@ -195,7 +217,8 @@ class _VocabularyLearningScreenState extends State<VocabularyLearningScreen> {
                                           ]
                                         ),
                                         child: Opacity(
-                                          opacity: _isLoadingAudio ? 0.5 : 1.0,
+                                          // Dim the button if audio isn't ready
+                                          opacity: _isAudioReady ? 1.0 : 0.4,
                                           child: Image.asset(
                                             // Using orange icons because background is white
                                             _isPlaying ? 'assets/images/pause_orange.png' : 'assets/images/play_orange.png', 
@@ -211,6 +234,7 @@ class _VocabularyLearningScreenState extends State<VocabularyLearningScreen> {
                                       ),
                                     ),
                                     
+                                    // Small Loading Indicator below button while caching
                                     if (_isLoadingAudio)
                                       Padding(
                                         padding: const EdgeInsets.only(top: 12.0),

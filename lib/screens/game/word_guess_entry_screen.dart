@@ -4,6 +4,44 @@ import 'game_level_screen.dart';
 import '../home_screen.dart';
 
 class WordGuessEntryScreen extends StatelessWidget {
+  
+  // Function to show the popup dialog
+  void _showHelpDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20), // Rounded corners for modern look
+          ),
+          title: Row(
+            children: const [
+              Icon(Icons.info_outline, color: Color(0xFFFF6E00)),
+              SizedBox(width: 10),
+              Text("Game Info"),
+            ],
+          ),
+          content: SingleChildScrollView(
+            // SingleChildScrollView ensures it fits on small screens (landscape phones etc)
+            child: const Text(
+              "Uncover the Bidayuh word behind each figure. Use hints wisely to crack the puzzle!.",
+              style: TextStyle(fontSize: 16, height: 1.5),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFFFF6E00), // Match App Orange
+              ),
+              child: const Text("Got it!", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -25,7 +63,6 @@ class WordGuessEntryScreen extends StatelessWidget {
           child: Stack(
             children: [
               // 1. MAIN CONTENT (Scrollable & Centered)
-              // LayoutBuilder allows us to calculate screen height for centering
               LayoutBuilder(
                 builder: (context, constraints) {
                   return SingleChildScrollView(
@@ -108,17 +145,42 @@ class WordGuessEntryScreen extends StatelessWidget {
                     padding: const EdgeInsets.all(8.0),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      // Optional: subtle background to make it visible if content scrolls behind
                       color: Colors.black.withOpacity(0.05), 
                     ),
                     child: Image.asset(
                       'assets/images/back_icon.png', 
                       width: 40, 
-                      height: 40
+                      height: 40,
+                      // Fallback icon if image is missing
+                      errorBuilder: (c, e, s) => const Icon(Icons.arrow_back, color: Colors.white, size: 30),
                     ),
                   ),
                 ),
               ),
+
+              // 3. HELP / QUESTION MARK (Fixed Top Right)
+              Positioned(
+                top: 10,
+                right: 10,
+                child: GestureDetector(
+                  onTap: () => _showHelpDialog(context),
+                  child: Container(
+                    padding: const EdgeInsets.all(8.0),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.black.withOpacity(0.05), // Matches the back button style
+                    ),
+                    // Using a standard Flutter icon here. 
+                    // If you have a specific asset, replace Icon with Image.asset like the back button.
+                    child: const Icon(
+                      Icons.help_outline_rounded, 
+                      color: Colors.white, 
+                      size: 40
+                    ),
+                  ),
+                ),
+              ),
+
             ],
           ),
         ),

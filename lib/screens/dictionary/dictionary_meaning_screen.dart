@@ -1,6 +1,8 @@
+import 'dart:io'; // Needed for File type
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart'; // Import cache manager
 import '../../theme/app_colors.dart';
 import '../../widgets/common_layouts.dart';
 
@@ -18,12 +20,12 @@ class DictionaryMeaningScreen extends StatefulWidget {
 class _DictionaryMeaningScreenState extends State<DictionaryMeaningScreen> {
   final AudioPlayer _audioPlayer = AudioPlayer();
   bool _isPlaying = false;
-  String? _audioUrl;
+  bool _isAudioReady = false; // Tracks if audio is cached and ready to play
 
   @override
   void initState() {
     super.initState();
-    _fetchAudioUrl();
+    _fetchAndCacheAudio(); 
     
     _audioPlayer.onPlayerStateChanged.listen((state) {
       if (mounted) {
@@ -32,26 +34,54 @@ class _DictionaryMeaningScreenState extends State<DictionaryMeaningScreen> {
         });
       }
     });
+
+    // When audio finishes, just stop (don't release resource) so we can replay instantly
+    _audioPlayer.onPlayerComplete.listen((event) {
+      if (mounted) {
+        setState(() {
+          _isPlaying = false;
+        });
+      }
+    });
   }
 
-  // Fetch audio URL from Firebase Storage
-  Future<void> _fetchAudioUrl() async {
+  // 1. Get URL from Firebase
+  // 2. Download and Save to Local Storage (Cache)
+  // 3. Set Player source to the LOCAL file
+  Future<void> _fetchAndCacheAudio() async {
     try {
+      // Step A: Construct the Firebase reference
       final ref = FirebaseStorage.instance.ref().child("vocabulary_audio/${widget.word.toLowerCase()}.mp3");
-      final url = await ref.getDownloadURL();
-      if (mounted) setState(() => _audioUrl = url);
+      
+      // Step B: Get the download URL (Requires internet the very first time to find the file)
+      final onlineUrl = await ref.getDownloadURL();
+
+      // Step C: Use CacheManager to download and save the file locally.
+      // If the file was downloaded previously, this returns the local file instantly (Offline support).
+      File localFile = await DefaultCacheManager().getSingleFile(onlineUrl);
+
+      if (mounted) {
+        // Step D: Configure the player to play from the LOCAL DEVICE file, not the internet
+        await _audioPlayer.setReleaseMode(ReleaseMode.stop);
+        await _audioPlayer.setSource(DeviceFileSource(localFile.path));
+        
+        setState(() => _isAudioReady = true);
+        print("Audio cached at: ${localFile.path}"); // Debugging: See where it saves
+      }
     } catch (e) {
-      print("Audio not found for ${widget.word}: $e");
+      print("Audio loading failed for ${widget.word}: $e");
     }
   }
 
   // Toggle Audio
   void _toggleAudio() async {
-    if (_audioUrl == null) return;
+    if (!_isAudioReady) return;
+
     if (_isPlaying) {
       await _audioPlayer.pause();
     } else {
-      await _audioPlayer.play(UrlSource(_audioUrl!));
+      // resume() plays the buffered/loaded local file instantly
+      await _audioPlayer.resume();
     }
   }
 
@@ -71,27 +101,23 @@ class _DictionaryMeaningScreenState extends State<DictionaryMeaningScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Custom Header (Fixed at top)
+            // Custom Header
             AppHeader(title: "BiTE Translator"),
             
-            // Expanded area that contains the scrollable content
             Expanded(
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   return SingleChildScrollView(
                     padding: EdgeInsets.symmetric(vertical: 20, horizontal: 16),
                     child: ConstrainedBox(
-                      // Ensures content is at least the height of the view, 
-                      // allowing alignment logic to work
                       constraints: BoxConstraints(
                         minHeight: constraints.maxHeight,
                       ),
                       child: Center(
-                        // Limits the width on Tablet/Desktop for a nice card look
                         child: Container(
                           constraints: BoxConstraints(maxWidth: 600),
                           child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center, // Vertically center content
+                            mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Text(
                                 "Dictionary Meaning", 
@@ -104,12 +130,12 @@ class _DictionaryMeaningScreenState extends State<DictionaryMeaningScreen> {
                               
                               SizedBox(height: 20),
                               
-                              // The White Card Container
+                              // White Card
                               Container(
                                 padding: EdgeInsets.all(24),
                                 decoration: BoxDecoration(
                                   color: AppColors.white,
-                                  borderRadius: BorderRadius.circular(16), // Rounded corners look better
+                                  borderRadius: BorderRadius.circular(16),
                                   boxShadow: [
                                     BoxShadow(
                                       color: Colors.black26, 
@@ -145,12 +171,17 @@ class _DictionaryMeaningScreenState extends State<DictionaryMeaningScreen> {
                                     // Audio Play Button
                                     Center(
                                       child: GestureDetector(
-                                        onTap: _audioUrl == null ? null : _toggleAudio,
-                                        child: Image.asset(
-                                          _isPlaying ? 'assets/images/pause_orange.png' : 'assets/images/play_orange.png', 
-                                          width: 60, 
-                                          height: 60,
-                                          errorBuilder: (c,e,s) => Icon(Icons.play_circle_fill, size: 60, color: AppColors.secondary),
+                                        onTap: _isAudioReady ? _toggleAudio : null,
+                                        child: AnimatedOpacity(
+                                          duration: Duration(milliseconds: 300),
+                                          // If audio isn't cached/ready yet, dim the button
+                                          opacity: _isAudioReady ? 1.0 : 0.3,
+                                          child: Image.asset(
+                                            _isPlaying ? 'assets/images/pause_orange.png' : 'assets/images/play_orange.png', 
+                                            width: 60, 
+                                            height: 60,
+                                            errorBuilder: (c,e,s) => Icon(Icons.play_circle_fill, size: 60, color: AppColors.secondary),
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -190,7 +221,6 @@ class _DictionaryMeaningScreenState extends State<DictionaryMeaningScreen> {
                                   ],
                                 ),
                               ),
-                              // Spacer at bottom so card doesn't touch navigation bar
                               SizedBox(height: 20),
                             ],
                           ),
